@@ -5,6 +5,78 @@ one SemVer stream, exact-tag pins, MAJOR = anything that can turn a consumer's
 green CI red without the consumer editing anything. While on `0.x`, breaking
 changes may land in any release.
 
+## v3.0.0 — 2026-08-01
+
+**MAJOR — the gates could not fail. They can now.** Every gate command is
+`gate-cmd 2>&1 | tee /tmp/x.log`, and GitHub's implicit shell for a `run:`
+step is `bash -e {0}` — **without `pipefail`**. The pipeline's exit status was
+therefore `tee`'s, always `0`, and every gate failure in every consumer was
+silently swallowed. This release makes the suite enforcing for the first time
+since the `| tee` summaries landed. Expect red gates on your bump PR: they are
+findings that were always there, not new rules.
+
+### Fixed
+
+- **`| tee` no longer masks gate exit codes** (all 22 gate steps). The
+  workflow now declares `defaults.run.shell: bash`, which selects
+  `bash --noprofile --norc -eo pipefail {0}`, so the gate command's status is
+  the step's status. Jobs set only `defaults.run.working-directory`, which
+  merges with the workflow-level `shell` per-key rather than replacing it.
+
+  Observed in the wild before the fix: an intendent run where `pip-audit`
+  reported 10 unignored CVEs and exited 1, while the job reported success. The
+  file header claimed "bash runs with -o pipefail, so tee never masks a real
+  failure" — that assumption was simply wrong, and is now enforced instead of
+  asserted.
+
+### Added
+
+- **`deps-skip-unchanged` input** (boolean, default `true`). On
+  `pull_request` runs, the pip-audit scan is skipped when the PR changes none
+  of `poetry.lock`, `pyproject.toml`, or `.colormath/audit.conf` (compared
+  three-dot against the base branch, so base-side churn doesn't count). The
+  scan is ~200 sequential per-package PyPI lookups — 6m15s of a 6m30s job in
+  intendent, against a suite where every other gate finishes under 2m30s — and
+  its verdict is a pure function of the locked set, the allowlist, and the
+  upstream advisory databases. A PR that moves neither of the first two can
+  only differ by the third, which the base branch re-checks on every merge.
+
+  **Non-PR events always run the full scan**, so merges to the default branch
+  still catch newly-published advisories. A consumer wanting a nightly
+  re-check just adds a `schedule:` trigger to its caller — no further config.
+  Set `deps-skip-unchanged: false` to scan on every run.
+
+  The `deps` job now checks out with `fetch-depth: 0` (merge-base needs
+  history), matching `migrations` and `diff-coverage`. `make audit` is
+  unchanged and always performs a full scan.
+
+### Upgrade notes
+
+Paste into Claude Code in each consumer repo:
+
+> Bump colormath from v2.x to v3.0.0: update the `@v2.x.x` pins in
+> `.github/workflows/gates.yml` and `.github/workflows/review.yaml` to
+> `@v3.0.0`, and run `make colormath-update REF=v3.0.0` so the vendored
+> `Makefile.colormath` stays in lockstep with the pins.
+>
+> v3.0.0 fixes a bug where `| tee` masked every gate's exit code, so gates
+> that were silently passing may now fail. **Run `make preflight` before
+> opening the bump PR** — it mirrors CI and will surface the backlog locally.
+> Triage what it finds: fix the real findings, and for anything you are not
+> ready to burn down, set that gate's `enable-<gate>: false` in the caller
+> (keeping `COLORMATH_PREFLIGHT_SKIP` in `Makefile.colormath` in lockstep) and
+> file yourself an issue. Do not merge a bump PR with a gate disabled and no
+> issue filed.
+>
+> Known for intendent specifically: the `deps` gate will go red on 10
+> unignored `onnx` advisories and 3 `nltk` advisories (CVE-2026-12075 /
+> -12061 / -12074, fixed in nltk 3.10.0). Bump nltk; for onnx, either bump to
+> 1.22.0 or add the ids to `.colormath/audit.conf` with a justification and a
+> revisit trigger.
+>
+> No input was renamed or removed and no gate default flipped, so the bump
+> itself is mechanical — the work is entirely in the findings it uncovers.
+
 ## v2.4.0 — 2026-07-31
 
 **MINOR — new `/colormath:review-ticket` skill; no consumer CI changes.** Purely
