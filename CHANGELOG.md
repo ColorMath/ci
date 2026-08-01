@@ -50,6 +50,37 @@ findings that were always there, not new rules.
   history), matching `migrations` and `diff-coverage`. `make audit` is
   unchanged and always performs a full scan.
 
+### Changed
+
+- **The review workflow's default models and effort now target cost**
+  (`.github/workflows/review.yml`). Measured on a real intendent PR, the two
+  agents cost **$1.00** (review, 18 turns) and **$0.53** (test-plan, 14 turns)
+  — $1.54 per pull request. Two defaults change, and consumers get both
+  without editing anything:
+
+  - **`test-plan-model` now defaults to `claude-haiku-4-5`** (previously it
+    inherited `model`, i.e. Sonnet 4.6). The test-plan agent does read-only
+    analysis and emits a checklist — work well inside Haiku's range — at $1/$5
+    per MTok against Sonnet's $3/$15. The review agent deliberately does
+    **not** move: adversarial review is where model tier buys real findings.
+  - **`review-effort` now defaults to `medium`**, below the model's own
+    `high`. Fewer thinking tokens and usually fewer turns, for a modest cost
+    in review depth.
+
+  Four new inputs make both tunable per agent: `review-model`,
+  `test-plan-model`, `review-effort`, `test-plan-effort`. An empty model falls
+  back to `model`; an empty effort passes no flag at all, leaving the model's
+  own default.
+
+  **`effort` is rejected by Haiku 4.5 and Sonnet 4.5**, so `test-plan-effort`
+  defaults to empty by necessity rather than preference — setting it while
+  `test-plan-model` is on the default Haiku will fail the request. Move
+  `test-plan-model` to a 4.6+ model first.
+
+  **If your caller sets `model:`**, it no longer reaches both agents:
+  `test-plan-model`'s non-empty default takes precedence over the fallback.
+  Set `test-plan-model` explicitly to keep one model everywhere.
+
 ### Upgrade notes
 
 Paste into Claude Code in each consumer repo:
@@ -74,8 +105,17 @@ Paste into Claude Code in each consumer repo:
 > 1.22.0 or add the ids to `.colormath/audit.conf` with a justification and a
 > revisit trigger.
 >
-> No input was renamed or removed and no gate default flipped, so the bump
-> itself is mechanical — the work is entirely in the findings it uncovers.
+> No input was renamed or removed and no gate default flipped, so the gate
+> half of the bump is mechanical — that work is entirely in the findings it
+> uncovers.
+>
+> The review workflow does change behavior on this bump, with no action
+> needed: the test-plan agent moves to Haiku and the reviewer drops to
+> `medium` effort, roughly halving review spend per PR. Two cases need a
+> caller edit — if you set `model:` and want it to apply to both agents, add a
+> matching `test-plan-model:`; and if you want the test-plan agent at a
+> non-default effort, move `test-plan-model:` to a 4.6+ model first, because
+> Haiku 4.5 rejects the effort parameter.
 
 ## v2.4.0 — 2026-07-31
 
