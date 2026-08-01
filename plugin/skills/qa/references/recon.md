@@ -72,10 +72,40 @@ credential still work" is a one-line test that occasionally pays out.
 Name the rows you create with an obvious prefix (`qa-…`) so cleanup in step 7
 is a single predictable delete.
 
-For browser/session work you'll need to go through the real login form. Expect
-a **CSRF token** on it: fetch the login page, scrape the hidden token, post it
+For browser/session work, the real login form is the first choice — it's the
+flow users actually take, and driving it tests the login path itself. Expect a
+**CSRF token** on it: fetch the login page, scrape the hidden token, post it
 back with a cookie jar. If login returns 403 with no explanation, that's
 almost always what's missing rather than bad credentials.
+
+**When you cannot submit the form, mint the session server-side rather than
+abandoning the UI checklist.** Typing a password into a field may be off the
+table for you even with valid demo credentials in hand; a login page behind
+SSO, a second factor, or a captcha blocks you the same way. None of that is a
+reason to report UI items as unverified — the session is the thing you need,
+and the app already knows how to create one:
+
+1. Find the call the login route makes *after* it verifies the password —
+   typically `create_session(user_id)` or equivalent — and what it puts in the
+   response. Read the `set_cookie` call for the exact cookie name and flags.
+2. Call that same function against the dev DB with the seeded user's id. Use
+   the app's own machinery; don't hand-forge a token or a signed cookie, or
+   you'll be testing your forgery rather than the app.
+3. Install the cookie in the browser profile (via the automation tool's script
+   execution, or a `document.cookie` write on the right origin — note that an
+   `httponly` cookie must be set through the browser's cookie API, not JS), then
+   navigate and proceed with the checklist normally.
+4. Prefix or record what you created so cleanup destroys it: the session row
+   should die with the rest of the QA debris in step 7.
+
+This is a **local dev stack only** technique. Never mint a session against
+staging, production, or any shared environment — there, an unavailable login is
+a genuine blocker to report, not an obstacle to route around.
+
+Say plainly in your report that the session was minted rather than logged into,
+and mark the login flow itself as untested — that's the one thing this
+technique cannot cover, and it's exactly the thing a reader will assume you
+did cover.
 
 Where the repo exposes a machine interface (an API, an MCP server), drive it
 over the wire with its real transport instead of calling functions in-process.
