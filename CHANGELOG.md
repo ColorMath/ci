@@ -77,6 +77,61 @@ Paste into Claude Code in each consumer repo:
 > No input was renamed or removed and no gate default flipped, so the bump
 > itself is mechanical — the work is entirely in the findings it uncovers.
 
+## v2.4.0 — 2026-07-31
+
+**MINOR — new `/colormath:review-ticket` skill; no consumer CI changes.** Purely
+additive: a new plugin skill, which LIFECYCLE classifies as MINOR. Nothing a
+consumer runs changes behavior, and the existing skills are untouched.
+
+### Added
+
+- **`/colormath:review-ticket` — groom a ticket until it can be worked**
+  (`plugin/skills/review-ticket/`). Fills the gap *before* the pipeline starts:
+  `bugfix` turns a reported defect into a fix, `qa` sweeps for unknown ones, and
+  `ship` carries a finished branch through the PR — but none of them help with a
+  one-line ticket nobody can act on. The skill reads the ticket and its full
+  comment thread, does a real code pass **before** asking anything, then asks the
+  few concrete questions whose answers change the outcome, and writes back a
+  standalone description, an implementation plan whose every step names a real
+  path, and a QA plan whose every item a person could execute without asking
+  what it meant.
+
+  Two failure modes drove the wording. **Fluent restatement** — expanding a
+  title into confident prose and generic steps ("update the relevant service")
+  that could have been written without opening the repo — is countered by
+  ordering investigation ahead of questions and by the rule that a plan step
+  naming no file is a wish. **Interrogation** — a dozen open-ended questions
+  that cost the filer more than writing the ticket themselves — is countered by
+  the one-batch cap (two rounds absolute maximum), concrete multiple choice via
+  `AskUserQuestion`, and the instruction to take a conventional default and
+  record it as a stated assumption rather than spend a question on it.
+
+  Step 2 hunts specifically for **what makes a ticket non-trivial**, because the
+  expensive miss is a one-line code change whose real work sits outside the diff
+  — a DNS record, a verified vendor identity, a migration ordering constraint, a
+  deploy that must reach two services. It also checks the repo's recorded
+  decisions, so a ticket asking for something an ADR explicitly rejected gets
+  caught during grooming rather than during review.
+
+  The skill grooms and stops: no branches, no code edits, and no creating,
+  splitting, moving or re-typing tickets as a side effect — an oversized ticket
+  gets a recommended split and the call stays with the user. When investigation
+  shows the ticket shouldn't be done at all, that finding is the deliverable
+  instead of a plan for work nobody needs.
+
+### Contract surfaces
+
+- **New dependency: the Abacus MCP server** — the plugin's first tracker
+  dependency. `review-ticket` keys on `mcp__abacus__get_ticket`,
+  `update_ticket`, `add_comment`, `list_boards` and `list_tickets`, on ticket
+  **keys** (`CM-00001`) as the identifier, and on Abacus's split of
+  `description`, `plan` and `qa_plan` into three separate fields — the skill
+  writes all three, because Abacus marks a story ready only once both `plan`
+  and `qa_plan` are set, so folding QA into the plan field leaves the ticket
+  looking unready. A rename of any of those tools or fields must ship with a
+  skill update in the same release. No other skill touches Abacus, and no
+  consumer CI does.
+
 ## v2.3.0 — 2026-07-24
 
 **MINOR — `/colormath:ship` no longer re-triggers the review; adds an explicit

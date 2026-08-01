@@ -168,6 +168,60 @@ plausible theory and proving it against the wrong environment or surface:
 - `make preflight` (step 6) and `/colormath:ship` for the handoff.
 - A browser is optional but makes UI-surface reproduction far more direct.
 
+## `/colormath:review-ticket` — groom a ticket until it can be worked
+
+Takes a ticket key (`/colormath:review-ticket CM-00001`) and turns a one-line
+reminder into something someone could pick up cold, on the principle that a
+ticket is *a reminder, not a specification* — it carries the trigger its author
+wrote down and none of the context they had in their head:
+
+1. **Read the ticket and everything attached** — description, existing plan,
+   every comment (where already-made decisions hide), type, swimlane, project
+   contents. An existing plan means revising, not authoring.
+2. **Investigate the code before asking anything** — does it already exist, or
+   was it deliberately rejected by a recorded decision; which files actually
+   change; is the ticket's own wording precise; is this one ticket or several.
+   Then hunts specifically for **what makes it non-trivial**, since a one-line
+   code change often hides the real work outside the diff — a DNS record, a
+   verified vendor identity, a deploy that must reach two services.
+3. **Ask only what changes the outcome** — concrete multiple choice rather than
+   an open survey, because step 2 already happened; batched into one round, two
+   at the ceiling. Where a conventional default exists it takes it and writes
+   the assumption into the ticket instead of spending a question.
+4. **Description that stands alone** — context, why it matters, acceptance
+   criteria as observables a third person could check, and what's out of scope.
+5. **Implementation plan someone could follow** — prerequisites and blockers
+   first, then ordered steps naming **real paths** (a step that names no file is
+   a wish), the layer the change belongs at, what explicitly *doesn't* change,
+   and the open questions that survived.
+6. **QA plan someone can execute** — happy path, authorization and tenancy, the
+   edges the change introduces, regression surface, data written under the old
+   behavior, accessibility, post-deploy checks; then splits what the test suite
+   covers from what needs hands, and names the gates the change implicates.
+7. **Show, confirm, write back** — drafts in chat first, calls out any text it
+   would overwrite that it didn't write, then on approval writes Abacus's three
+   distinct fields (`description`, `plan`, `qa_plan`) rather than folding QA
+   into the plan, since a story only reads as ready once both plans are set.
+
+It grooms and stops. It never implements, never opens a branch, and never
+creates, splits or moves tickets as a side effect — if the work is really
+several tickets it recommends the split and leaves the call to you. When the
+investigation shows the ticket shouldn't be done at all — already built, already
+rejected, or solving a problem that no longer exists — that finding is the
+deliverable instead of a dutiful plan.
+
+**Prerequisites:**
+
+- The **Abacus MCP server** connected to the session — this skill keys directly
+  on `get_ticket` / `update_ticket` / `add_comment` and on Abacus's split of
+  `description` and `plan` into separate fields. It is the plugin's one tracker
+  dependency; without that server the skill has nothing to read or write.
+- A checkout of the repo the ticket concerns, since step 2 is a real code pass —
+  grooming from the ticket text alone is the failure mode the skill exists to
+  prevent.
+- Nothing else: no running stack, no `gh`, no gates. The deliverable is the
+  ticket.
+
 ## Adding a skill
 
 One directory per skill: `skills/<name>/SKILL.md` with frontmatter
