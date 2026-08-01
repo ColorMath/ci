@@ -240,9 +240,31 @@ jobs:
       review-focus: "Pay attention to <project-specific hot spots>."
 ```
 
-Inputs: `model` (default `claude-sonnet-4-6`), `review-focus` (extra
-project-specific emphasis for the reviewer), and `enable-review` /
-`enable-test-plan` toggles. Requires an `ANTHROPIC_API_KEY` repo secret.
+Inputs: `review-focus` (extra project-specific emphasis for the reviewer),
+`enable-review` / `enable-test-plan` toggles, and per-agent model and effort
+controls. Requires an `ANTHROPIC_API_KEY` repo secret.
+
+| Input | Default | Purpose |
+|---|---|---|
+| `model` | `"claude-sonnet-4-6"` | Fallback for whichever agent has no explicit model |
+| `review-model` | `""` → `model` | Model for the review agent |
+| `test-plan-model` | `"claude-haiku-4-5"` | Model for the test-plan agent |
+| `review-effort` | `"medium"` | `--effort` for the review agent |
+| `test-plan-effort` | `""` (no flag) | `--effort` for the test-plan agent |
+
+The two agents are priced very differently in practice — on a representative
+PR the reviewer cost $1.00 over 18 turns and the test-plan agent $0.53 over
+14. So the defaults put the test-plan agent on Haiku (read-only analysis
+producing a checklist — well inside its range, at a third of Sonnet's price)
+and drop the reviewer to `medium` effort, while leaving the reviewer itself on
+Sonnet, where adversarial depth actually buys findings.
+
+Two sharp edges. **`effort` is rejected by Haiku 4.5 and Sonnet 4.5**, so
+setting `test-plan-effort` while `test-plan-model` is on its Haiku default
+will fail the request — move that model to a 4.6+ model first. And because
+`test-plan-model` has a non-empty default, setting `model:` alone no longer
+reaches both agents; set `test-plan-model:` too if you want one model
+everywhere.
 
 The `issue_comment` / `pull_request_review_comment` triggers are what enable
 `@claude` re-runs, but they come with noise: GitHub can't filter comment

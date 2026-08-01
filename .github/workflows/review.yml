@@ -47,9 +47,43 @@ on:
   workflow_call:
     inputs:
       model:
-        description: Claude model for both agents
+        description: >-
+          Fallback model, used by whichever agent has no explicit model set.
+          Since test-plan-model now defaults to Haiku, setting this alone no
+          longer changes both agents — set test-plan-model too if you want one
+          model everywhere.
         type: string
         default: "claude-sonnet-4-6"
+      review-model:
+        description: >-
+          Model for the review agent. Empty falls back to `model`. Kept on
+          Sonnet by default: adversarial review is the half of this workflow
+          where model tier actually buys findings.
+        type: string
+        default: ""
+      test-plan-model:
+        description: >-
+          Model for the test-plan agent. This agent does read-only analysis and
+          emits a checklist, which Haiku handles at a third of Sonnet's price —
+          the larger of the two savings, and the reason it defaults down here
+          while the reviewer does not.
+        type: string
+        default: "claude-haiku-4-5"
+      review-effort:
+        description: >-
+          Claude Code `--effort` for the review agent (low | medium | high |
+          max; xhigh needs Opus 4.7+). Empty passes no flag. Defaults to medium
+          rather than the model's own `high`, trading some depth for spend.
+        type: string
+        default: "medium"
+      test-plan-effort:
+        description: >-
+          Claude Code `--effort` for the test-plan agent. Empty by design:
+          effort is rejected by Haiku 4.5 and Sonnet 4.5, so setting this
+          alongside the default test-plan-model will fail the request. Set it
+          only when you have also moved test-plan-model to a 4.6+ model.
+        type: string
+        default: ""
       review-focus:
         description: Extra project-specific emphasis appended to the review prompt (e.g. sensitive surfaces to scrutinize)
         type: string
@@ -111,8 +145,10 @@ jobs:
           # to post and the review silently goes only to the job log.
           track_progress: true
           # --verbose streams every turn/tool-call to the Actions log so the
-          # run is easy to follow live.
-          claude_args: "--model ${{ inputs.model }} --verbose"
+          # run is easy to follow live. --effort is appended only when the
+          # caller sets it, so the default arg string is byte-identical to
+          # what shipped before these inputs existed.
+          claude_args: "--model ${{ inputs.review-model || inputs.model }} --verbose${{ inputs.review-effort && format(' --effort {0}', inputs.review-effort) || '' }}"
           prompt: |
             You are running a THERMONUCLEAR review: an unusually strict,
             adversarial audit of this PR's diff. Assume the author and their
@@ -202,7 +238,7 @@ jobs:
           # Same tag-mode wiring as `review` so the agent can always post its
           # comment, even on an automation/comment trigger.
           track_progress: true
-          claude_args: "--model ${{ inputs.model }} --verbose"
+          claude_args: "--model ${{ inputs.test-plan-model || inputs.model }} --verbose${{ inputs.test-plan-effort && format(' --effort {0}', inputs.test-plan-effort) || '' }}"
           prompt: |
             You are the QA TEST-PLAN agent for this PR. You do read-only
             analysis: study the PR's diff (and the surrounding code as context)
