@@ -87,6 +87,16 @@ Two design choices worth calling out:
   from `poetry.lock` for the production dependency groups only, and npm audit
   runs with `--omit=dev` — dev tooling never triggers a CVE failure, and
   local runs audit exactly what CI audits.
+- **`deps` skips PRs that don't move dependencies.** The scan is ~200
+  sequential PyPI lookups (minutes, against a suite where everything else
+  finishes in ~2), and its verdict can only change when the locked set, the
+  allowlist, or the upstream advisory databases move. So on a `pull_request`
+  that touches none of `poetry.lock`, `pyproject.toml`, or
+  `.colormath/audit.conf`, it reports green without scanning. Every other
+  event — including each push to the default branch — scans in full, so
+  newly-published advisories still surface on merge; add a `schedule:`
+  trigger to your caller if you also want a nightly re-check. Opt out with
+  `deps-skip-unchanged: false`. `make audit` always scans in full.
 - **`migrations` catches alembic divergence before the merge.** A PR that
   branched before newer migrations landed on the base branch merges into
   multiple alembic heads. The gate diffs the base branch against the PR's

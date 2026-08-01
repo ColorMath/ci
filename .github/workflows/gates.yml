@@ -41,8 +41,15 @@ name: Gates
 #
 # Every job ends with a "gate summary" that appends a compact stats block to
 # $GITHUB_STEP_SUMMARY, so the whole gate matrix is legible at a glance.
-# Gate commands tee output to /tmp/*.log (bash runs with -o pipefail, so tee
-# never masks a real failure); the summary reads the log back.
+# Gate commands tee output to /tmp/*.log; the summary reads the log back.
+#
+# The workflow-level `defaults.run.shell: bash` below is load-bearing, not
+# cosmetic. GitHub's implicit shell for a `run:` step is `bash -e {0}` — no
+# `pipefail` — so in `gate-cmd 2>&1 | tee /tmp/x.log` the pipeline's status is
+# tee's, and every gate failure was silently swallowed. Naming the shell
+# explicitly gets `bash --noprofile --norc -eo pipefail {0}`, so the gate
+# command's exit code is the step's. Do not remove it, and do not add a
+# job-level `defaults.run.shell` that overrides it.
 
 on:
   workflow_call:
@@ -70,7 +77,7 @@ on:
       colormath-ref:
         description: colormath ref to fetch gate scripts from (stamped per release; do not set as a consumer)
         type: string
-        default: "v2.0.0"
+        default: "v3.0.0"
       ruff-spec:
         description: pip requirement spec for ruff (match your pyproject dev pin)
         type: string
@@ -181,10 +188,28 @@ on:
       enable-import-linter:
         type: boolean
         default: true
+      deps-skip-unchanged:
+        description: >
+          On pull_request runs, skip the pip-audit scan when the PR changes
+          none of poetry.lock, pyproject.toml, or the audit config. The scan
+          costs ~6 min of sequential PyPI lookups and can only return a new
+          verdict when the locked set or the allowlist moves. Non-PR events
+          (push, schedule, workflow_dispatch) always run the full scan, so
+          every merge to the default branch still re-checks against
+          newly-published advisories. Set false to scan on every run.
+        type: boolean
+        default: true
 
 env:
   # Resolved base branch for diff-coverage: explicit input, else repo default.
   DEFAULT_BRANCH: ${{ inputs.default-branch != '' && inputs.default-branch || github.event.repository.default_branch }}
+
+# Applies to every `run:` step in every job below. Jobs set only
+# `defaults.run.working-directory`, which merges with this per-key rather than
+# replacing it. See the header comment: without this, `| tee` masks exit codes.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   ruff:
@@ -806,6 +831,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # merge-base with the base branch, for the skip check
 
       - name: Check out colormath (gate tooling)
         uses: actions/checkout@v6
@@ -817,20 +844,70 @@ jobs:
             scripts
             .github
 
+      # pip-audit spends ~6 min on sequential per-package PyPI lookups (~200
+      # requests for an ML-heavy tree). Its verdict is a pure function of three
+      # things: the locked versions, the allowlist, and the upstream advisory
+      # databases. A PR that moves none of the first two can only differ from
+      # its base by the third — and the base branch re-scans in full on every
+      # merge, so that case is already covered there. Skip those PRs; scan
+      # everything else. A consumer wanting a nightly re-check adds a
+      # `schedule:` trigger to its caller — non-PR events always scan.
+      - name: Decide whether the dependency inputs moved
+        id: scope
+        env:
+          SKIP_UNCHANGED: ${{ inputs.deps-skip-unchanged }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$SKIP_UNCHANGED" != "true" ] || [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "scan=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Every uncertain path below resolves to scan=true: a gate that
+          # cannot prove the deps are unchanged must scan, never skip.
+          if ! git fetch --no-tags origin "$DEFAULT_BRANCH"; then
+            echo "could not fetch origin/${DEFAULT_BRANCH} — scanning in full"
+            echo "scan=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Pathspecs resolve against the job's working-directory. The conf
+          # path mirrors audit-deps.sh's own default so the two cannot drift.
+          conf="${COLORMATH_AUDIT_CONF:-.colormath/audit.conf}"
+          # Three-dot: changes THIS PR made, ignoring base-side churn. Any
+          # non-zero status (a real diff, or git erroring out) means scan.
+          if git diff --quiet "origin/${DEFAULT_BRANCH}...HEAD" -- \
+               poetry.lock pyproject.toml "$conf"; then
+            echo "scan=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "scan=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: ${{ steps.scope.outputs.scan == 'true' }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 
       - name: Install Poetry + export plugin + pip-audit
+        if: ${{ steps.scope.outputs.scan == 'true' }}
         run: |
           pipx install poetry==2.1.4
           poetry self add poetry-plugin-export
           pip install pip-audit
 
       - name: Audit locked dependencies for CVEs
+        if: ${{ steps.scope.outputs.scan == 'true' }}
         run: |
           "$GITHUB_WORKSPACE/.colormath-lib/scripts/audit-deps.sh" 2>&1 | tee /tmp/audit.log
+
+      - name: Report skipped scan
+        if: ${{ steps.scope.outputs.scan != 'true' }}
+        run: |
+          echo "SKIPPED: dependency inputs unchanged vs origin/${DEFAULT_BRANCH}" \
+            | tee /tmp/audit.log
+          echo "This PR touches none of poetry.lock, pyproject.toml, or the" \
+            "audit config, so the locked set and allowlist are identical to" \
+            "the base branch. ${DEFAULT_BRANCH} scans in full on every merge." \
+            | tee -a /tmp/audit.log
 
       - name: Gate summary
         if: always()
@@ -841,7 +918,7 @@ jobs:
           log-files: /tmp/audit.log
           tail-lines: "20"
           stats: |
-            verdict=$(grep -m1 -oE 'No known vulnerabilities found|Found [0-9]+ known vulnerabilit[a-z]*' /tmp/audit.log 2>/dev/null || echo 'see log')
+            verdict=$(grep -m1 -oE 'SKIPPED: .*|No known vulnerabilities found|Found [0-9]+ known vulnerabilit[a-z]*' /tmp/audit.log 2>/dev/null || echo 'see log')
             echo "- Verdict: ${verdict}"
 
   js-deps:
