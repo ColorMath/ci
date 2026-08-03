@@ -7,7 +7,7 @@ changes may land in any release.
 
 ## Unreleased
 
-MINOR when cut. A new plugin skill is additive per
+MINOR when cut. Two new plugin skills are additive per
 [LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
 for anyone with the old command in their fingers — cannot turn a consumer's CI
 red, which is the test that makes a release MAJOR.
@@ -55,6 +55,29 @@ red, which is the test that makes a release MAJOR.
   replaces both fields.
 
   Second skill to require the Abacus MCP server, after `refine-ticket`.
+
+- **`/colormath:plan-initiative`** (`plugin/skills/plan-initiative/`) — runs
+  `refine-ticket` over every ticket in an initiative, one at a time, in build
+  order, injecting what that skill cannot see on its own: the initiative and its
+  settled decisions, the ticket's position in the sequence, what came before it
+  and *what those plans decided*, and what comes after it.
+
+  The reason is the seams. Run by hand seven times, `refine-ticket` grooms seven
+  strangers — re-deriving the same background, asking the same question seven
+  times, and producing plans that each make locally sensible choices that
+  contradict each other where they meet. Answers carry forward, so the questions
+  thin out as the run goes.
+
+  A ticket counts as planned only when both `plan` and `qa_plan` are set,
+  re-read from the tracker rather than assumed from the sub-skill returning.
+  **Tasks are skipped by design** — that type has no plans and the tracker
+  refuses to write them. It holds no `update_ticket` tool, because writing plans
+  is `refine-ticket`'s job, and no `Edit`/`Write`, so it cannot touch the repo.
+
+  **Contract surfaces** (Abacus MCP): `get_ticket` returning `type`,
+  `initiative_status`, `children`, `plan` and `qa_plan`; `add_comment`. Plus the
+  `refine-ticket` skill itself — the two ship together and a change to either's
+  contract is a change to both.
 
 ## v3.0.0 — 2026-08-01
 

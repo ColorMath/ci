@@ -282,6 +282,47 @@ it always sends the title.
   mode the skill exists to prevent.
 - Nothing else: no running stack, no `gh`, no gates.
 
+## `/colormath:plan-initiative` — plan a whole initiative, in order
+
+Takes an initiative key (`/colormath:plan-initiative CM-00007`) and runs
+`refine-ticket` over every ticket under it, one at a time, in build order:
+
+1. **Check it can be planned** — it is an initiative, and its tickets exist. They
+   are cut when a human starts building, so a `designing` initiative has none:
+   the skill says so and points at `refine-initiative` rather than starting the
+   build to unblock itself.
+2. **Establish the order and show the run** — children sorted by position (build
+   order, carried down from the feature list), which are already planned, which
+   are **tasks** and therefore unplannable by design, and how many groomings the
+   user is about to sit through. A seven-ticket initiative is a long session, and
+   someone who knows that up front can say "just the first three today".
+3. **Plan each one with its place in the sequence** — invokes
+   `/colormath:refine-ticket` with the key first, then the context that skill
+   cannot see: the initiative and its settled decisions, "ticket 3 of 7", what
+   came **before** it and *what those plans actually decided*, what comes
+   **after** it so this one doesn't absorb it, and the feature definition it was
+   cut from.
+4. **Carry the answers forward** — what the user answers for ticket 2 is injected
+   into ticket 3, so the questions thin out as the run goes rather than repeating.
+5. **Verify, then report** — re-reads each ticket and counts it planned only when
+   both `plan` and `qa_plan` are actually set. Finishes with the per-ticket state
+   plus what only becomes visible from up here: contradictions it reconciled,
+   gaps the tickets don't cover, and tickets that shouldn't exist.
+
+The reason it exists is the seams. Run by hand seven times, `refine-ticket`
+grooms seven strangers: it re-derives the same background each time, asks the
+same question each time, and produces plans that each make locally sensible
+choices that contradict each other where they meet.
+
+It holds no `update_ticket` tool — it never writes a plan itself, which is
+`refine-ticket`'s job — and no `Edit`/`Write`, so it cannot touch the repo. It
+does not create, split, re-type or delete tickets, and it does not start
+building.
+
+**Prerequisites:** the **Abacus MCP server**, a checkout of the repo (every
+`refine-ticket` call does a real code pass), and an initiative that has already
+started building. Nothing else.
+
 ## Adding a skill
 
 One directory per skill: `skills/<name>/SKILL.md` with frontmatter

@@ -295,13 +295,17 @@ whose every step names a real file, and a QA plan someone could execute; and
 reading its feature definitions, investigating the architecture and decision
 records they land in, interviewing until the picture is complete, then rewriting
 the initiative and every feature with the background implementation needs, while
-stopping short of code-level plans and never starting the build. Each skill's
-behavior, prerequisites, and contract dependencies are documented in
-[plugin/README.md](plugin/README.md).
+stopping short of code-level plans and never starting the build; and
+**`/colormath:plan-initiative`** closes the loop between the two — running
+`refine-ticket` over every ticket in an initiative, in build order, injecting
+each ticket's place in the sequence and what the earlier plans decided, so the
+seams line up instead of seven independent groomings contradicting each other.
+Each skill's behavior, prerequisites, and contract dependencies are documented
+in [plugin/README.md](plugin/README.md).
 
-`refine-ticket` and `refine-initiative` need the
+`refine-ticket`, `refine-initiative` and `plan-initiative` need the
 [Abacus](https://github.com/ColorMath/abacus) MCP server connected — the
-plugin's one tracker dependency, and the only two skills that have it.
+plugin's one tracker dependency.
 
 Install manually:
 
