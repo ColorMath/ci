@@ -323,6 +323,47 @@ building.
 `refine-ticket` call does a real code pass), and an initiative that has already
 started building. Nothing else.
 
+## `/colormath:implement-ticket` — build a planned ticket and ship it
+
+Takes a ticket key (`/colormath:implement-ticket CM-00012`) and takes a groomed
+ticket the rest of the way. The thinking already happened in `refine-ticket`;
+this is where it meets the code:
+
+1. **Read it and check it can be built** — no implementation plan means back to
+   `refine-ticket`, because a plan written by the same run that implements it has
+   never been read by anyone. A **task** carries no plans by design and is not
+   code work; an **initiative** is the wrong altitude. Reads the parent
+   initiative too when there is one, so the build doesn't collide with the ticket
+   next to it.
+2. **Check the plan against the code before touching anything** — the plan was
+   written against the codebase as it *was*: files move, adjacent changes land,
+   assumptions expire. Every step is walked against the repo, and where it no
+   longer holds that is a **finding for the user**, not something to route around
+   silently. Sometimes the most valuable outcome here is "this plan no longer
+   holds, here's why" rather than a PR.
+3. **Ask only what actually blocks** — by this point there is usually nothing;
+   grooming's whole job was to remove it. One round, and wanting several rounds
+   means the ticket isn't groomed and should go back.
+4. **Build it at the layer the plan names**, on a branch, in the idiom of the
+   surrounding code, with tests at the layer the change lives at. Deviations from
+   the plan are recorded in chat, the PR body and a ticket comment — never by
+   rewriting the plan field, which would erase the difference between what was
+   intended and what happened.
+5. **Execute the QA plan against the running stack** — every item gets an
+   observation, `⚠️` when no browser is reachable for a UI item, and a failure is
+   fixed and re-run rather than shipped with the document claiming it passed.
+6. **Ship** — `make preflight`, then `/colormath:ship` for PR, gates, review,
+   test plan and the merge decision. Comments the outcome back onto the ticket.
+
+It leaves the ticket's own fields alone: `plan` and `qa_plan` are the record of
+intent, the comment is the record of what happened. It does not move tickets
+between lanes — one board's "In Review" is another's "Staging", and guessing at
+somebody's workflow is worse than leaving it where they put it.
+
+**Prerequisites:** the **Abacus MCP server**, a checkout with the stack runnable
+(step 5 is real QA, not a test run), and `/colormath:ship`'s own prerequisites,
+since it hands off there.
+
 ## Adding a skill
 
 One directory per skill: `skills/<name>/SKILL.md` with frontmatter
