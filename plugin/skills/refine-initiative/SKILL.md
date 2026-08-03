@@ -1,6 +1,6 @@
 ---
 name: refine-initiative
-description: Turn a thin initiative into one a team could build from — read it and its feature definitions, investigate the architecture it lands in, interview the person who filed it until the picture is complete, then rewrite the initiative and every feature with the background and structure implementation needs. Use this whenever someone wants an initiative refined, fleshed out, scoped, designed, "made real", or checked before it starts building — or names an initiative and asks what it would actually take. Stops short of code-level plans: those belong on the tickets (/colormath:review-ticket), and this is the layer above.
+description: Turn a thin initiative into one a team could build from — read it and its feature definitions, investigate the architecture it lands in, interview the person who filed it until the picture is complete, then rewrite the initiative and every feature with the background and structure implementation needs. Use this whenever someone wants an initiative refined, fleshed out, scoped, designed, "made real", or checked before it starts building — or names an initiative and asks what it would actually take. Stops short of code-level plans: those belong on the tickets (/colormath:refine-ticket), and this is the layer above.
 argument-hint: [initiative key, e.g. CM-00007 — or enough of the title to find it]
 allowed-tools: Bash Read Grep Glob AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__add_feature mcp__abacus__update_feature mcp__abacus__move_feature mcp__abacus__list_boards mcp__abacus__list_tickets
 ---
@@ -22,7 +22,7 @@ lines into four paragraphs of fluent prose that add words and no information,
 none of it checked against the codebase. The second is **designing the code** —
 sliding down into file-by-file steps, function signatures, and schema DDL. That
 is a different job at a different altitude, done per ticket, later, by
-`/colormath:review-ticket`. This skill's altitude is: *what is being built, in
+`/colormath:refine-ticket`. This skill's altitude is: *what is being built, in
 what shape, against what that already exists, and does it hold together.*
 
 The spine is **read → investigate → interview → draft → confirm → write**.
@@ -37,7 +37,7 @@ zero-padding don't matter. If "$ARGUMENTS" is a title fragment, find it with
 doing anything else.
 
 **Check `type` is `initiative`.** If it isn't, stop. Say what it is, and point
-at `/colormath:review-ticket`, which is the right tool for a ticket. Do not
+at `/colormath:refine-ticket`, which is the right tool for a ticket. Do not
 quietly refine a feature as if it were an initiative — the deliverable is
 shaped differently and would be wrong.
 
@@ -172,7 +172,7 @@ The initiative's **description** carries:
 **Stop short of code.** No file-by-file steps, no function signatures, no DDL,
 no test lists. If you catch yourself writing `services/billing.py:212`, you have
 dropped an altitude — that belongs to the ticket, and
-`/colormath:review-ticket` will write it there later. Naming a *module* as the
+`/colormath:refine-ticket` will write it there later. Naming a *module* as the
 home for a feature is the right level; naming a line is not.
 
 Then each **feature definition** gets rewritten so that it is a thing someone
@@ -233,7 +233,7 @@ that and should not offer to.
 ## Rules
 
 - **Check it is an initiative, and check its status, first.** A ticket goes to
-  `/colormath:review-ticket`. A building initiative is locked, and saying so
+  `/colormath:refine-ticket`. A building initiative is locked, and saying so
   early is the difference between a conversation and a failed write.
 - **Investigate before you interview.** Questions from a cold read are a survey;
   questions after an architecture pass are a decision.

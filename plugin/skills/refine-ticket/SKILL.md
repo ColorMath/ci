@@ -1,5 +1,5 @@
 ---
-name: review-ticket
+name: refine-ticket
 description: Turn a thin ticket into one that can actually be worked — read it, investigate the code it touches, ask the few questions whose answers change the outcome, then write back a clear description, a file-anchored implementation plan, and an executable QA plan. Use this whenever someone wants a ticket groomed, refined, fleshed out, scoped, estimated, made ready, or "looked at properly" — or names a ticket key (CM-00001) and asks what it would take. Not for finding unknown problems in a feature (that's /colormath:qa), not for a reported defect you intend to fix now (that's /colormath:bugfix), and not for implementing the ticket — the groomed ticket is the deliverable.
 argument-hint: [ticket key, e.g. CM-00001 — or enough of the title to find it]
 allowed-tools: Bash Read Grep Glob AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__abacus__list_members

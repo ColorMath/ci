@@ -287,7 +287,7 @@ fixes to `ship`; **`/colormath:bugfix`** turns a *specific* bug report into a
 merged fix — establishing the facts the report omitted, reproducing the defect
 before touching code, fixing at the layer the invariant belongs to, remediating
 data the bug already corrupted, then handing off to `ship`; and
-**`/colormath:review-ticket`** grooms a ticket until it can be worked —
+**`/colormath:refine-ticket`** grooms a ticket until it can be worked —
 investigating the code *before* it asks anything, so its questions are few and
 concrete, then writing back a standalone description, an implementation plan
 whose every step names a real file, and a QA plan someone could execute; and
@@ -299,7 +299,7 @@ stopping short of code-level plans and never starting the build. Each skill's
 behavior, prerequisites, and contract dependencies are documented in
 [plugin/README.md](plugin/README.md).
 
-`review-ticket` and `refine-initiative` need the
+`refine-ticket` and `refine-initiative` need the
 [Abacus](https://github.com/ColorMath/abacus) MCP server connected — the
 plugin's one tracker dependency, and the only two skills that have it.
 

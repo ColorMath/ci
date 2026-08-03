@@ -168,9 +168,9 @@ plausible theory and proving it against the wrong environment or surface:
 - `make preflight` (step 6) and `/colormath:ship` for the handoff.
 - A browser is optional but makes UI-surface reproduction far more direct.
 
-## `/colormath:review-ticket` — groom a ticket until it can be worked
+## `/colormath:refine-ticket` — groom a ticket until it can be worked
 
-Takes a ticket key (`/colormath:review-ticket CM-00001`) and turns a one-line
+Takes a ticket key (`/colormath:refine-ticket CM-00001`) and turns a one-line
 reminder into something someone could pick up cold, on the principle that a
 ticket is *a reminder, not a specification* — it carries the trigger its author
 wrote down and none of the context they had in their head:
@@ -230,7 +230,7 @@ initiative is *a direction, not a design* — a title, a handful of feature line
 and none of the connective tissue that makes them buildable:
 
 1. **Check it is an initiative, and check its status** — a plain ticket goes to
-   `review-ticket` instead; an initiative that has already started **building**
+   `refine-ticket` instead; an initiative that has already started **building**
    has its features locked by the server, so the skill says so up front rather
    than discovering it at the write step, and offers the description as the only
    thing it can still change.
@@ -260,7 +260,7 @@ and none of the connective tissue that makes them buildable:
    `update_feature` / `add_feature` / `move_feature`.
 
 It **stops short of code**. No file-by-file steps, no signatures, no DDL, no test
-lists — that is the ticket's altitude, and `/colormath:review-ticket` writes it
+lists — that is the ticket's altitude, and `/colormath:refine-ticket` writes it
 there later. It never bends an architectural rule silently: if the initiative
 needs one to move, that is a question and then a line in the write-up. And it
 **never starts building** — that transition is one-way, locks the features and

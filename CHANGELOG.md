@@ -7,14 +7,33 @@ changes may land in any release.
 
 ## Unreleased
 
-MINOR when cut — a new plugin skill, which per [LIFECYCLE.md](LIFECYCLE.md) is
-additive: nothing existing changes behavior, and a consumer that never invokes
-it is unaffected.
+MINOR when cut. A new plugin skill is additive per
+[LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
+for anyone with the old command in their fingers — cannot turn a consumer's CI
+red, which is the test that makes a release MAJOR.
+
+### Changed
+
+- **`/colormath:review-ticket` is now `/colormath:refine-ticket`**
+  (`plugin/skills/refine-ticket/`). Same skill, same behavior, same contract
+  surfaces — only the command name moves, so that the two grooming skills read
+  as the pair they are: `refine-ticket` for a ticket, `refine-initiative` for
+  the initiative above it. "Review" also collided with the *other* review in
+  this plugin — the Thermonuclear Review that `ship` waits on — which is an
+  adversarial audit of a diff, not grooming.
+
+  **This breaks muscle memory and any docs that name the old command.**
+  `/colormath:review-ticket` stops existing at this release; there is no alias.
+  MINOR rather than MAJOR under [LIFECYCLE.md](LIFECYCLE.md)'s test, which is
+  about a consumer's CI going red without them editing anything — a skill is
+  invoked by a person, and no gate, workflow input or Makefile target moves
+  here. Grep your consumer repos for `colormath:review-ticket` when you take
+  this release; product copy that tells users to run it is the likely hit.
 
 ### Added
 
 - **`/colormath:refine-initiative`** (`plugin/skills/refine-initiative/`) — the
-  layer above `review-ticket`. Takes an initiative, reads its feature
+  layer above `refine-ticket`. Takes an initiative, reads its feature
   definitions and the tickets already under it, investigates the architecture
   and decision records those features land in, interviews the filer in batched
   concrete rounds, then rewrites the initiative's description and every feature
@@ -22,7 +41,7 @@ it is unaffected.
 
   It is deliberately bounded at both ends. It **stops short of code**: no
   file-by-file steps, no signatures, no DDL — that altitude belongs to
-  `review-ticket`, per ticket, later. And it **never starts building**, because
+  `refine-ticket`, per ticket, later. And it **never starts building**, because
   that transition is one-way, locks the feature list and cuts a ticket per
   feature; there is no MCP tool for it and the skill hands back instead of
   asking for one.
@@ -35,7 +54,7 @@ it is unaffected.
   there is no delete tool for feature definitions, and `update_feature`
   replaces both fields.
 
-  Second skill to require the Abacus MCP server, after `review-ticket`.
+  Second skill to require the Abacus MCP server, after `refine-ticket`.
 
 ## v3.0.0 — 2026-08-01
 
