@@ -5,6 +5,80 @@ one SemVer stream, exact-tag pins, MAJOR = anything that can turn a consumer's
 green CI red without the consumer editing anything. While on `0.x`, breaking
 changes may land in any release.
 
+## Unreleased
+
+MINOR when cut. Two new plugin skills are additive per
+[LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
+for anyone with the old command in their fingers — cannot turn a consumer's CI
+red, which is the test that makes a release MAJOR.
+
+### Changed
+
+- **`/colormath:review-ticket` is now `/colormath:refine-ticket`**
+  (`plugin/skills/refine-ticket/`). Same skill, same behavior, same contract
+  surfaces — only the command name moves, so that the two grooming skills read
+  as the pair they are: `refine-ticket` for a ticket, `refine-initiative` for
+  the initiative above it. "Review" also collided with the *other* review in
+  this plugin — the Thermonuclear Review that `ship` waits on — which is an
+  adversarial audit of a diff, not grooming.
+
+  **This breaks muscle memory and any docs that name the old command.**
+  `/colormath:review-ticket` stops existing at this release; there is no alias.
+  MINOR rather than MAJOR under [LIFECYCLE.md](LIFECYCLE.md)'s test, which is
+  about a consumer's CI going red without them editing anything — a skill is
+  invoked by a person, and no gate, workflow input or Makefile target moves
+  here. Grep your consumer repos for `colormath:review-ticket` when you take
+  this release; product copy that tells users to run it is the likely hit.
+
+### Added
+
+- **`/colormath:refine-initiative`** (`plugin/skills/refine-initiative/`) — the
+  layer above `refine-ticket`. Takes an initiative, reads its feature
+  definitions and the tickets already under it, investigates the architecture
+  and decision records those features land in, interviews the filer in batched
+  concrete rounds, then rewrites the initiative's description and every feature
+  so a team could build from them.
+
+  It is deliberately bounded at both ends. It **stops short of code**: no
+  file-by-file steps, no signatures, no DDL — that altitude belongs to
+  `refine-ticket`, per ticket, later. And it **never starts building**, because
+  that transition is one-way, locks the feature list and cuts a ticket per
+  feature; there is no MCP tool for it and the skill hands back instead of
+  asking for one.
+
+  **Contract surfaces it depends on** (Abacus MCP): `get_ticket` returning
+  `type`, `initiative_status`, `features` and `children`; `update_ticket`;
+  `add_feature`, `update_feature`, `move_feature`; `add_comment`. A rename of
+  any of them must ship with a skill update in the same release. It also relies
+  on two current asymmetries, and names both rather than working around them:
+  there is no delete tool for feature definitions, and `update_feature`
+  replaces both fields.
+
+  Second skill to require the Abacus MCP server, after `refine-ticket`.
+
+- **`/colormath:plan-initiative`** (`plugin/skills/plan-initiative/`) — runs
+  `refine-ticket` over every ticket in an initiative, one at a time, in build
+  order, injecting what that skill cannot see on its own: the initiative and its
+  settled decisions, the ticket's position in the sequence, what came before it
+  and *what those plans decided*, and what comes after it.
+
+  The reason is the seams. Run by hand seven times, `refine-ticket` grooms seven
+  strangers — re-deriving the same background, asking the same question seven
+  times, and producing plans that each make locally sensible choices that
+  contradict each other where they meet. Answers carry forward, so the questions
+  thin out as the run goes.
+
+  A ticket counts as planned only when both `plan` and `qa_plan` are set,
+  re-read from the tracker rather than assumed from the sub-skill returning.
+  **Tasks are skipped by design** — that type has no plans and the tracker
+  refuses to write them. It holds no `update_ticket` tool, because writing plans
+  is `refine-ticket`'s job, and no `Edit`/`Write`, so it cannot touch the repo.
+
+  **Contract surfaces** (Abacus MCP): `get_ticket` returning `type`,
+  `initiative_status`, `children`, `plan` and `qa_plan`; `add_comment`. Plus the
+  `refine-ticket` skill itself — the two ship together and a change to either's
+  contract is a change to both.
+
 ## v3.0.0 — 2026-08-01
 
 **MAJOR — the gates could not fail. They can now.** Every gate command is

@@ -168,9 +168,9 @@ plausible theory and proving it against the wrong environment or surface:
 - `make preflight` (step 6) and `/colormath:ship` for the handoff.
 - A browser is optional but makes UI-surface reproduction far more direct.
 
-## `/colormath:review-ticket` — groom a ticket until it can be worked
+## `/colormath:refine-ticket` — groom a ticket until it can be worked
 
-Takes a ticket key (`/colormath:review-ticket CM-00001`) and turns a one-line
+Takes a ticket key (`/colormath:refine-ticket CM-00001`) and turns a one-line
 reminder into something someone could pick up cold, on the principle that a
 ticket is *a reminder, not a specification* — it carries the trigger its author
 wrote down and none of the context they had in their head:
@@ -221,6 +221,107 @@ deliverable instead of a dutiful plan.
   prevent.
 - Nothing else: no running stack, no `gh`, no gates. The deliverable is the
   ticket.
+
+## `/colormath:refine-initiative` — design an initiative before it is built
+
+Takes an initiative key (`/colormath:refine-initiative CM-00007`) and turns a
+direction into something a team could build from, on the principle that an
+initiative is *a direction, not a design* — a title, a handful of feature lines,
+and none of the connective tissue that makes them buildable:
+
+1. **Check it is an initiative, and check its status** — a plain ticket goes to
+   `refine-ticket` instead; an initiative that has already started **building**
+   has its features locked by the server, so the skill says so up front rather
+   than discovering it at the write step, and offers the description as the only
+   thing it can still change.
+2. **Read all of it** — description, every feature definition in order, every
+   comment, and the tickets already filed under it (which only `get_ticket`
+   returns).
+3. **Investigate the architecture before asking anything** — the written
+   decisions first (`AGENTS.md`, `docs/adr/`, rules files), then the code each
+   feature lands in: does it already exist, which layer owns it, what it forces
+   (a table, a migration, an event type, a deploy ordering), what it collides
+   with, whether each feature is implementable as written, and what the feature
+   list is *missing*.
+4. **Interview until the picture is complete** — concrete multiple choice, up to
+   four questions a round, three rounds usually plenty; a fourth round means it
+   is designing the code (stop) or the initiative is really several (say so). It
+   asks about the problem behind the title, what "done" looks like for the whole
+   thing, the scope edges, the structural forks step 3 surfaced, and any
+   architectural rule the work would need to bend.
+5. **Rewrite at the right altitude** — the initiative's description carries the
+   problem, the shape of the change, the real modules it lands in, the decisions
+   taken and what they beat, the invariants it lives inside by ADR number, what
+   is out of scope, and the surviving unknowns. Each feature is rewritten as a
+   capability someone could take, with what it includes, what it does not, and
+   the observable that means it works. The list is left in build order.
+6. **Show, confirm, write back** — drafts everything in chat first, names what it
+   would overwrite, then writes `update_ticket` (description only), then
+   `update_feature` / `add_feature` / `move_feature`.
+
+It **stops short of code**. No file-by-file steps, no signatures, no DDL, no test
+lists — that is the ticket's altitude, and `/colormath:refine-ticket` writes it
+there later. It never bends an architectural rule silently: if the initiative
+needs one to move, that is a question and then a line in the write-up. And it
+**never starts building** — that transition is one-way, locks the features and
+cuts a ticket per feature, so it is a person's decision and there is deliberately
+no tool for it.
+
+Two asymmetries it names rather than works around: there is **no delete tool**
+for feature definitions, so a feature that should go is recommended for removal
+and left to you in the web UI; and `update_feature` **replaces both fields**, so
+it always sends the title.
+
+**Prerequisites:**
+
+- The **Abacus MCP server** connected, including the initiative tools
+  (`get_ticket` returning `initiative_status` and `features`, plus `add_feature`
+  / `update_feature` / `move_feature`).
+- A checkout of the repo the initiative concerns, since step 3 is a real code and
+  decision-record pass — refining from the initiative text alone is the failure
+  mode the skill exists to prevent.
+- Nothing else: no running stack, no `gh`, no gates.
+
+## `/colormath:plan-initiative` — plan a whole initiative, in order
+
+Takes an initiative key (`/colormath:plan-initiative CM-00007`) and runs
+`refine-ticket` over every ticket under it, one at a time, in build order:
+
+1. **Check it can be planned** — it is an initiative, and its tickets exist. They
+   are cut when a human starts building, so a `designing` initiative has none:
+   the skill says so and points at `refine-initiative` rather than starting the
+   build to unblock itself.
+2. **Establish the order and show the run** — children sorted by position (build
+   order, carried down from the feature list), which are already planned, which
+   are **tasks** and therefore unplannable by design, and how many groomings the
+   user is about to sit through. A seven-ticket initiative is a long session, and
+   someone who knows that up front can say "just the first three today".
+3. **Plan each one with its place in the sequence** — invokes
+   `/colormath:refine-ticket` with the key first, then the context that skill
+   cannot see: the initiative and its settled decisions, "ticket 3 of 7", what
+   came **before** it and *what those plans actually decided*, what comes
+   **after** it so this one doesn't absorb it, and the feature definition it was
+   cut from.
+4. **Carry the answers forward** — what the user answers for ticket 2 is injected
+   into ticket 3, so the questions thin out as the run goes rather than repeating.
+5. **Verify, then report** — re-reads each ticket and counts it planned only when
+   both `plan` and `qa_plan` are actually set. Finishes with the per-ticket state
+   plus what only becomes visible from up here: contradictions it reconciled,
+   gaps the tickets don't cover, and tickets that shouldn't exist.
+
+The reason it exists is the seams. Run by hand seven times, `refine-ticket`
+grooms seven strangers: it re-derives the same background each time, asks the
+same question each time, and produces plans that each make locally sensible
+choices that contradict each other where they meet.
+
+It holds no `update_ticket` tool — it never writes a plan itself, which is
+`refine-ticket`'s job — and no `Edit`/`Write`, so it cannot touch the repo. It
+does not create, split, re-type or delete tickets, and it does not start
+building.
+
+**Prerequisites:** the **Abacus MCP server**, a checkout of the repo (every
+`refine-ticket` call does a real code pass), and an initiative that has already
+started building. Nothing else.
 
 ## Adding a skill
 

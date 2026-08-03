@@ -287,16 +287,25 @@ fixes to `ship`; **`/colormath:bugfix`** turns a *specific* bug report into a
 merged fix — establishing the facts the report omitted, reproducing the defect
 before touching code, fixing at the layer the invariant belongs to, remediating
 data the bug already corrupted, then handing off to `ship`; and
-**`/colormath:review-ticket`** grooms a ticket until it can be worked —
+**`/colormath:refine-ticket`** grooms a ticket until it can be worked —
 investigating the code *before* it asks anything, so its questions are few and
 concrete, then writing back a standalone description, an implementation plan
-whose every step names a real file, and a QA plan someone could execute. Each
-skill's behavior, prerequisites, and contract dependencies are documented in
-[plugin/README.md](plugin/README.md).
+whose every step names a real file, and a QA plan someone could execute; and
+**`/colormath:refine-initiative`** does the layer above for an initiative —
+reading its feature definitions, investigating the architecture and decision
+records they land in, interviewing until the picture is complete, then rewriting
+the initiative and every feature with the background implementation needs, while
+stopping short of code-level plans and never starting the build; and
+**`/colormath:plan-initiative`** closes the loop between the two — running
+`refine-ticket` over every ticket in an initiative, in build order, injecting
+each ticket's place in the sequence and what the earlier plans decided, so the
+seams line up instead of seven independent groomings contradicting each other.
+Each skill's behavior, prerequisites, and contract dependencies are documented
+in [plugin/README.md](plugin/README.md).
 
-`review-ticket` needs the [Abacus](https://github.com/ColorMath/abacus) MCP
-server connected — it's the plugin's one tracker dependency, and the only skill
-that has it.
+`refine-ticket`, `refine-initiative` and `plan-initiative` need the
+[Abacus](https://github.com/ColorMath/abacus) MCP server connected — the
+plugin's one tracker dependency.
 
 Install manually:
 
