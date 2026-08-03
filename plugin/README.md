@@ -222,6 +222,66 @@ deliverable instead of a dutiful plan.
 - Nothing else: no running stack, no `gh`, no gates. The deliverable is the
   ticket.
 
+## `/colormath:refine-initiative` — design an initiative before it is built
+
+Takes an initiative key (`/colormath:refine-initiative CM-00007`) and turns a
+direction into something a team could build from, on the principle that an
+initiative is *a direction, not a design* — a title, a handful of feature lines,
+and none of the connective tissue that makes them buildable:
+
+1. **Check it is an initiative, and check its status** — a plain ticket goes to
+   `review-ticket` instead; an initiative that has already started **building**
+   has its features locked by the server, so the skill says so up front rather
+   than discovering it at the write step, and offers the description as the only
+   thing it can still change.
+2. **Read all of it** — description, every feature definition in order, every
+   comment, and the tickets already filed under it (which only `get_ticket`
+   returns).
+3. **Investigate the architecture before asking anything** — the written
+   decisions first (`AGENTS.md`, `docs/adr/`, rules files), then the code each
+   feature lands in: does it already exist, which layer owns it, what it forces
+   (a table, a migration, an event type, a deploy ordering), what it collides
+   with, whether each feature is implementable as written, and what the feature
+   list is *missing*.
+4. **Interview until the picture is complete** — concrete multiple choice, up to
+   four questions a round, three rounds usually plenty; a fourth round means it
+   is designing the code (stop) or the initiative is really several (say so). It
+   asks about the problem behind the title, what "done" looks like for the whole
+   thing, the scope edges, the structural forks step 3 surfaced, and any
+   architectural rule the work would need to bend.
+5. **Rewrite at the right altitude** — the initiative's description carries the
+   problem, the shape of the change, the real modules it lands in, the decisions
+   taken and what they beat, the invariants it lives inside by ADR number, what
+   is out of scope, and the surviving unknowns. Each feature is rewritten as a
+   capability someone could take, with what it includes, what it does not, and
+   the observable that means it works. The list is left in build order.
+6. **Show, confirm, write back** — drafts everything in chat first, names what it
+   would overwrite, then writes `update_ticket` (description only), then
+   `update_feature` / `add_feature` / `move_feature`.
+
+It **stops short of code**. No file-by-file steps, no signatures, no DDL, no test
+lists — that is the ticket's altitude, and `/colormath:review-ticket` writes it
+there later. It never bends an architectural rule silently: if the initiative
+needs one to move, that is a question and then a line in the write-up. And it
+**never starts building** — that transition is one-way, locks the features and
+cuts a ticket per feature, so it is a person's decision and there is deliberately
+no tool for it.
+
+Two asymmetries it names rather than works around: there is **no delete tool**
+for feature definitions, so a feature that should go is recommended for removal
+and left to you in the web UI; and `update_feature` **replaces both fields**, so
+it always sends the title.
+
+**Prerequisites:**
+
+- The **Abacus MCP server** connected, including the initiative tools
+  (`get_ticket` returning `initiative_status` and `features`, plus `add_feature`
+  / `update_feature` / `move_feature`).
+- A checkout of the repo the initiative concerns, since step 3 is a real code and
+  decision-record pass — refining from the initiative text alone is the failure
+  mode the skill exists to prevent.
+- Nothing else: no running stack, no `gh`, no gates.
+
 ## Adding a skill
 
 One directory per skill: `skills/<name>/SKILL.md` with frontmatter

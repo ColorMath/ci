@@ -5,6 +5,38 @@ one SemVer stream, exact-tag pins, MAJOR = anything that can turn a consumer's
 green CI red without the consumer editing anything. While on `0.x`, breaking
 changes may land in any release.
 
+## Unreleased
+
+MINOR when cut — a new plugin skill, which per [LIFECYCLE.md](LIFECYCLE.md) is
+additive: nothing existing changes behavior, and a consumer that never invokes
+it is unaffected.
+
+### Added
+
+- **`/colormath:refine-initiative`** (`plugin/skills/refine-initiative/`) — the
+  layer above `review-ticket`. Takes an initiative, reads its feature
+  definitions and the tickets already under it, investigates the architecture
+  and decision records those features land in, interviews the filer in batched
+  concrete rounds, then rewrites the initiative's description and every feature
+  so a team could build from them.
+
+  It is deliberately bounded at both ends. It **stops short of code**: no
+  file-by-file steps, no signatures, no DDL — that altitude belongs to
+  `review-ticket`, per ticket, later. And it **never starts building**, because
+  that transition is one-way, locks the feature list and cuts a ticket per
+  feature; there is no MCP tool for it and the skill hands back instead of
+  asking for one.
+
+  **Contract surfaces it depends on** (Abacus MCP): `get_ticket` returning
+  `type`, `initiative_status`, `features` and `children`; `update_ticket`;
+  `add_feature`, `update_feature`, `move_feature`; `add_comment`. A rename of
+  any of them must ship with a skill update in the same release. It also relies
+  on two current asymmetries, and names both rather than working around them:
+  there is no delete tool for feature definitions, and `update_feature`
+  replaces both fields.
+
+  Second skill to require the Abacus MCP server, after `review-ticket`.
+
 ## v3.0.0 — 2026-08-01
 
 **MAJOR — the gates could not fail. They can now.** Every gate command is

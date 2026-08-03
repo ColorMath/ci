@@ -290,13 +290,18 @@ data the bug already corrupted, then handing off to `ship`; and
 **`/colormath:review-ticket`** grooms a ticket until it can be worked —
 investigating the code *before* it asks anything, so its questions are few and
 concrete, then writing back a standalone description, an implementation plan
-whose every step names a real file, and a QA plan someone could execute. Each
-skill's behavior, prerequisites, and contract dependencies are documented in
+whose every step names a real file, and a QA plan someone could execute; and
+**`/colormath:refine-initiative`** does the layer above for an initiative —
+reading its feature definitions, investigating the architecture and decision
+records they land in, interviewing until the picture is complete, then rewriting
+the initiative and every feature with the background implementation needs, while
+stopping short of code-level plans and never starting the build. Each skill's
+behavior, prerequisites, and contract dependencies are documented in
 [plugin/README.md](plugin/README.md).
 
-`review-ticket` needs the [Abacus](https://github.com/ColorMath/abacus) MCP
-server connected — it's the plugin's one tracker dependency, and the only skill
-that has it.
+`review-ticket` and `refine-initiative` need the
+[Abacus](https://github.com/ColorMath/abacus) MCP server connected — the
+plugin's one tracker dependency, and the only two skills that have it.
 
 Install manually:
 
