@@ -7,7 +7,7 @@ changes may land in any release.
 
 ## Unreleased
 
-MINOR when cut. Two new plugin skills are additive per
+MINOR when cut. Three new plugin skills are additive per
 [LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
 for anyone with the old command in their fingers — cannot turn a consumer's CI
 red, which is the test that makes a release MAJOR.
@@ -78,6 +78,34 @@ red, which is the test that makes a release MAJOR.
   `initiative_status`, `children`, `plan` and `qa_plan`; `add_comment`. Plus the
   `refine-ticket` skill itself — the two ship together and a change to either's
   contract is a change to both.
+
+- **`/colormath:implement-ticket`** (`plugin/skills/implement-ticket/`) — takes
+  a groomed ticket from its plan to a shipped PR, closing the chain the other
+  skills start: `refine-initiative` designs, `plan-initiative` plans every
+  ticket, `refine-ticket` plans one, this one builds it.
+
+  It executes the plan rather than rewriting it, and the step that earns its
+  keep is the one before any code: **the plan was written against the codebase
+  as it was**, so every step is walked against the repo first. Where it no
+  longer holds, that is a finding for the user — silently improving a plan is
+  how a reviewed decision gets replaced by an unreviewed one, and sometimes the
+  right outcome is "this plan no longer holds" rather than a PR.
+
+  Then: build on a branch at the layer the plan names, execute the ticket's **QA
+  plan against the running stack** (every item observed, `⚠️` when a UI item has
+  no browser, failures fixed and re-run rather than shipped with the document
+  claiming they passed), `make preflight`, and hand off to `/colormath:ship`.
+  Deviations land in the PR body and a ticket comment; the `plan` and `qa_plan`
+  fields are left alone as the record of intent. It does not move tickets
+  between lanes, because lane meaning is per board.
+
+  A ticket with no plan is sent back to `refine-ticket` rather than planned and
+  implemented in one breath, which would mean nobody ever reviewed the plan. A
+  **task** is refused: that type carries no plans by design and is not code work.
+
+  **Contract surfaces** (Abacus MCP): `get_ticket` returning `type`, `plan`,
+  `qa_plan` and the parent initiative; `add_comment`. Plus `/colormath:ship` and
+  `/colormath:qa`'s recon discipline.
 
 ## v3.0.0 — 2026-08-01
 

@@ -299,13 +299,16 @@ stopping short of code-level plans and never starting the build; and
 **`/colormath:plan-initiative`** closes the loop between the two — running
 `refine-ticket` over every ticket in an initiative, in build order, injecting
 each ticket's place in the sequence and what the earlier plans decided, so the
-seams line up instead of seven independent groomings contradicting each other.
-Each skill's behavior, prerequisites, and contract dependencies are documented
-in [plugin/README.md](plugin/README.md).
+seams line up instead of seven independent groomings contradicting each other;
+and **`/colormath:implement-ticket`** takes a groomed ticket the rest of the way
+— checking its plan still matches the code before touching anything, building at
+the layer the plan names, executing the ticket's QA plan against the running
+stack, then handing off to `ship`. Each skill's behavior, prerequisites, and
+contract dependencies are documented in [plugin/README.md](plugin/README.md).
 
-`refine-ticket`, `refine-initiative` and `plan-initiative` need the
-[Abacus](https://github.com/ColorMath/abacus) MCP server connected — the
-plugin's one tracker dependency.
+`refine-ticket`, `refine-initiative`, `plan-initiative` and
+`implement-ticket` need the [Abacus](https://github.com/ColorMath/abacus) MCP
+server connected — the plugin's one tracker dependency.
 
 Install manually:
 
