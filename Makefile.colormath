@@ -19,7 +19,7 @@
 #     `jslint`/`styles`/`a11y`, optional .gitleaks.toml
 # ----------------------------------------------------------------------------
 
-COLORMATH_REF = v2.0.0
+COLORMATH_REF = v3.0.0
 COLORMATH_RAW = https://raw.githubusercontent.com/ColorMath/ci/$(COLORMATH_REF)
 
 # Overridable knobs — set before the include if your project differs.
@@ -120,6 +120,7 @@ coverage-diff: ## Gate: changed lines vs the base branch are covered
 	curl -fsSL --retry 3 $(COLORMATH_RAW)/scripts/diff-coverage.sh -o $$tmp || { \
 		echo "colormath: could not fetch scripts/diff-coverage.sh@$(COLORMATH_REF) — this gate needs network access" >&2; \
 		rm -f $$tmp; exit 1; }; \
+	if [ -f .colormath/ci.env ]; then set -a; . .colormath/ci.env; set +a; fi; \
 	DIFF_COVER_BASE='$(COLORMATH_DIFF_COVER_BASE)' \
 	DIFF_COVER_FAIL_UNDER='$(COLORMATH_DIFF_COVER_FAIL_UNDER)' \
 	bash $$tmp; rc=$$?; rm -f $$tmp; exit $$rc

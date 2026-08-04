@@ -20,6 +20,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The two stamped refs must agree: gates.yml's `colormath-ref` default is how
+  # CI fetches its scripts, and Makefile.colormath's COLORMATH_REF is how the
+  # local mirror fetches the same ones. When they drift, `make preflight` runs
+  # different gate scripts than CI does — silently, and only wrongly once a
+  # script changes between the two tags. LIFECYCLE step 2 stamps both; this is
+  # the check that it actually happened.
+  refs-lockstep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: colormath-ref default matches COLORMATH_REF
+        run: |
+          wf=$(grep -A3 'colormath-ref:' .github/workflows/gates.yml \
+               | grep -m1 'default:' | sed 's/.*default: *"\(.*\)".*/\1/')
+          mk=$(grep -m1 '^COLORMATH_REF' Makefile.colormath | sed 's/.*= *//')
+          echo "gates.yml  colormath-ref default : $wf"
+          echo "Makefile.colormath COLORMATH_REF : $mk"
+          if [ "$wf" != "$mk" ]; then
+            echo "::error::Stamped refs drifted. Update both (LIFECYCLE.md, Releasing step 2)."
+            exit 1
+          fi
+
   gates:
     uses: ./.github/workflows/gates.yml
     with:
