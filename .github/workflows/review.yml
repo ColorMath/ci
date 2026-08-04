@@ -27,7 +27,7 @@ name: Review
 #       types: [created]
 #   jobs:
 #     review:
-#       uses: ColorMath/ci/.github/workflows/review.yml@v1.0.0
+#       uses: ColorMath/ci/.github/workflows/review.yml@vX.Y.Z  # see /releases/latest
 #       permissions:
 #         contents: read
 #         pull-requests: write

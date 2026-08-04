@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   gates:
-    uses: ColorMath/ci/.github/workflows/gates.yml@v2.0.0
+    uses: ColorMath/ci/.github/workflows/gates.yml@vX.Y.Z   # latest: /releases/latest
     with:
       python-version: "3.12"
       default-branch: main
@@ -120,7 +120,7 @@ existing findings, land the caller with the failing gates disabled, burn the
 findings down, and enable them one by one:
 
 ```yaml
-    uses: ColorMath/ci/.github/workflows/gates.yml@v2.0.0
+    uses: ColorMath/ci/.github/workflows/gates.yml@vX.Y.Z   # latest: /releases/latest
     with:
       python-version: "3.12"
       default-branch: main
@@ -229,7 +229,7 @@ on:
 
 jobs:
   review:
-    uses: ColorMath/ci/.github/workflows/review.yml@v2.0.0
+    uses: ColorMath/ci/.github/workflows/review.yml@vX.Y.Z  # latest: /releases/latest
     permissions:
       contents: read
       pull-requests: write
@@ -346,10 +346,14 @@ factory options and escape hatches), and
 [Agent docs](#agent-docs) below). Vendor them once:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/Makefile.colormath
-curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/eslint.config.colormath.mjs
-curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/AGENTS.colormath.md
+# REF is the release you are pinning to — see github.com/ColorMath/ci/releases/latest
+REF=vX.Y.Z
+curl -fsSLO "https://raw.githubusercontent.com/ColorMath/ci/$REF/Makefile.colormath"
+curl -fsSLO "https://raw.githubusercontent.com/ColorMath/ci/$REF/eslint.config.colormath.mjs"
+curl -fsSLO "https://raw.githubusercontent.com/ColorMath/ci/$REF/AGENTS.colormath.md"
 ```
+
+Thereafter `make colormath-update REF=vX.Y.Z` refreshes all three in one step.
 
 then include the Makefile from yours, providing the one target it expects
 from you (`test`) and setting knobs before the include if your project
@@ -407,9 +411,18 @@ tokens live. [example/AGENTS.md](example/AGENTS.md) shows the wiring.
 
 ## Versioning and upgrades
 
-One SemVer tag stream, and consumers pin **exact tags only** (`@v2.0.0`, never
-a floating major tag): an upgrade should arrive as a reviewable PR whose diff
-and changelog explain themselves — not as a surprise inside an unrelated one.
+One SemVer tag stream, and consumers pin **exact tags only** (a specific
+`@vX.Y.Z`, never a floating major tag): an upgrade should arrive as a
+reviewable PR whose diff and changelog explain themselves — not as a surprise
+inside an unrelated one. Every tag has a
+[GitHub Release](https://github.com/ColorMath/ci/releases) carrying that
+version's changelog section, so
+[releases/latest](https://github.com/ColorMath/ci/releases/latest) is the
+authoritative answer to "what should I pin to?"
+
+The snippets above deliberately say `vX.Y.Z` rather than a real version. Pins
+written into documentation rot silently — these had been sitting three
+releases stale — so there is nothing here to keep up to date.
 
 The rule for MAJOR: *if a consumer's CI can go from green to red without the
 consumer editing anything, it's MAJOR.* New gates ship disabled-by-default in
@@ -430,6 +443,7 @@ Makefile.colormath             # shared local gate targets — vendored by consu
 eslint.config.colormath.mjs    # shared eslint base — vendored by consumers
 AGENTS.colormath.md            # shared agent conventions — vendored by consumers
 scripts/                       # gate scripts, fetched by the workflow at its own ref
+release/                       # release tooling — stamp, verify, cut (not shipped)
 example/                       # minimal compliant consumer + contract reference
 docs/                          # adoption notes for the maintainer's own products
 ```

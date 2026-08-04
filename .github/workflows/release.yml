@@ -1,0 +1,67 @@
+name: Release
+
+# Cut a release: stamp, commit, annotated tag, atomic push, GitHub Release.
+#
+# A thin wrapper. All of the logic lives in release/cut.sh so that a release can
+# be rehearsed and debugged locally (`./release/cut.sh vX.Y.Z --dry-run`) rather
+# than only ever running inside Actions, where a half-finished release is the
+# expensive way to find a bug.
+#
+# workflow_dispatch only. Releasing is a decision, and the one gesture that
+# makes it is a human choosing the version here — everything after that is
+# machine-driven and verified.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, e.g. 3.1.0 (the tag becomes v3.1.0)
+        type: string
+        required: true
+      dry-run:
+        description: Verify and show the release diff, but publish nothing
+        type: boolean
+        default: false
+
+# Never cancel a release in flight: the push is atomic, but the GitHub Release
+# that follows it is a second system, and a cancel between the two leaves work
+# for the resume path to finish rather than something merely half-cancelled.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      # The repo's default workflow token is read-only; pushing main and the tag
+      # needs this. `actions: read` is for the CI-is-green precondition.
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history and tags: verify.sh compares against the newest
+          # reachable tag, and cut.sh refuses to run on a shallow clone.
+          fetch-depth: 0
+          # Keep the credential so `git push --atomic` works.
+          persist-credentials: true
+
+      - name: Configure the release committer
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Cut ${{ inputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./release/cut.sh "${{ inputs.version }}" \
+            ${{ inputs.dry-run && '--dry-run' || '' }}
+
+      # Note: pushes made with GITHUB_TOKEN do not trigger further workflows, so
+      # CI will not re-run on the release commit. That is fine and deliberate —
+      # ci.yml's `gates` job pins colormath-ref to github.sha and so never
+      # exercises the stamps anyway, cut.sh required CI to be green on the
+      # commit being released, and verify.sh --expect ran against the exact tree
+      # that got tagged.
