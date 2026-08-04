@@ -42,9 +42,15 @@ contractual at `v1.0.0`.
 1. Land the change on `main` via PR — colormath's own CI (the gate suite
    running against `example/`) must be green. If the change touches the gates'
    behavior, `example/` must be updated in the same PR to keep it passing.
-2. **Stamp the ref**: update the `colormath-ref` input default in
-   `.github/workflows/gates.yml` to the tag you are about to cut (this is how
-   the workflow fetches its own matching scripts/actions in consumer repos).
+2. **Stamp both refs** to the tag you are about to cut:
+   - the `colormath-ref` input default in `.github/workflows/gates.yml` — how
+     the workflow fetches its own matching scripts/actions in consumer repos;
+   - `COLORMATH_REF` in `Makefile.colormath` — how the *local* mirror fetches
+     those same scripts, so `make preflight` runs what CI runs.
+
+   They must match, and CI's `refs-lockstep` job fails the PR when they don't.
+   Miss the second and preflight silently runs an older gate script than CI —
+   invisible until a script changes between the two tags.
 3. Update `CHANGELOG.md` (with Upgrade notes if MAJOR).
 4. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 5. **Canary**: bump talas first (PR with the new `@vX.Y.Z`), merge when its

@@ -12,6 +12,43 @@ MINOR when cut. Three new plugin skills are additive per
 for anyone with the old command in their fingers — cannot turn a consumer's CI
 red, which is the test that makes a release MAJOR.
 
+### Fixed
+
+- **`make coverage-diff` did not source `.colormath/ci.env`**
+  (`Makefile.colormath`). CI's `diff-coverage` gate sources it before running
+  pytest; the local mirror of that gate did not. So a consumer whose app needs
+  test configuration to import at all — a session secret, a provider key —
+  got a passing gate in CI and a collection error locally, from the same
+  commit. `make preflight` is only useful if it runs what CI runs.
+
+  Found while bumping intendent to v3.0.0: `make test` had been fixed to
+  mirror CI, and `coverage-diff` was the one remaining target still running
+  pytest with the wrong environment. The fix uses the same `if [ -f … ]; then
+  set -a; . …; set +a; fi` form as the CI step, so the two are literally the
+  same idiom.
+
+  This closes the half colormath owns, and only that half. Whether the app
+  *also* reads a local `.env` is the consumer's business: a `.env` holding
+  container-only paths still leaks into host runs, and neutralizing that stays
+  with the consumer. So a consumer workaround can shed its ci.env-sourcing
+  half at this release, but not necessarily all of it.
+
+- **The two stamped refs could drift, and had** (`Makefile.colormath`,
+  `.github/workflows/ci.yml`, `LIFECYCLE.md`). `gates.yml`'s `colormath-ref`
+  default is how CI fetches its gate scripts; `Makefile.colormath`'s
+  `COLORMATH_REF` is how `make preflight` fetches the same ones. The release
+  checklist stamped only the first, so `COLORMATH_REF` sat at `v2.0.0` while
+  CI moved to `v3.0.0` — preflight fetching scripts from a tag three releases
+  behind the workflow.
+
+  Harmless so far purely by luck: `audit-deps.sh`, `migrations-sync.sh` and
+  `diff-coverage.sh` are byte-identical between `v2.0.0` and `v3.0.0`. The
+  first script change would have made local and CI disagree with no signal.
+  `COLORMATH_REF` is corrected to `v3.0.0`, LIFECYCLE step 2 now names both,
+  and a `refs-lockstep` job in colormath's own CI fails the PR when they
+  disagree — machinery rather than a checklist habit, because the checklist
+  already had the step and it was still missed.
+
 ### Changed
 
 - **`/colormath:review-ticket` is now `/colormath:refine-ticket`**
