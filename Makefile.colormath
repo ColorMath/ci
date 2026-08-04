@@ -21,7 +21,7 @@
 #     up the gate, shipping and guardrail conventions from one shared copy
 # ----------------------------------------------------------------------------
 
-COLORMATH_REF = v3.1.0
+COLORMATH_REF = v3.0.0
 COLORMATH_RAW = https://raw.githubusercontent.com/ColorMath/ci/$(COLORMATH_REF)
 
 # Overridable knobs — set before the include if your project differs.

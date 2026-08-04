@@ -20,27 +20,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The two stamped refs must agree: gates.yml's `colormath-ref` default is how
-  # CI fetches its scripts, and Makefile.colormath's COLORMATH_REF is how the
-  # local mirror fetches the same ones. When they drift, `make preflight` runs
-  # different gate scripts than CI does — silently, and only wrongly once a
-  # script changes between the two tags. LIFECYCLE step 2 stamps both; this is
-  # the check that it actually happened.
-  refs-lockstep:
+  # Every version this repo writes down must agree, and must name a tag that
+  # exists. Consumers pin exact tags, so a stamp naming an untagged version
+  # means every consumer's `make preflight` 404s on every gate script, and a
+  # stamp naming an older tag means CI and the local mirror silently run
+  # different gate scripts. Both have happened; see release/verify.sh.
+  #
+  # Safe to block, despite LIFECYCLE.md's warning about drift gates, because it
+  # can only fail on a PR that edited a version string. A PR touching none of
+  # them inherits main's consistent state and passes unconditionally — this
+  # gate can never stand between a hotfix and main.
+  release-consistency:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: colormath-ref default matches COLORMATH_REF
-        run: |
-          wf=$(grep -A3 'colormath-ref:' .github/workflows/gates.yml \
-               | grep -m1 'default:' | sed 's/.*default: *"\(.*\)".*/\1/')
-          mk=$(grep -m1 '^COLORMATH_REF' Makefile.colormath | sed 's/.*= *//')
-          echo "gates.yml  colormath-ref default : $wf"
-          echo "Makefile.colormath COLORMATH_REF : $mk"
-          if [ "$wf" != "$mk" ]; then
-            echo "::error::Stamped refs drifted. Update both (LIFECYCLE.md, Releasing step 2)."
-            exit 1
-          fi
+        with:
+          # verify.sh compares the stamps against the newest reachable tag.
+          fetch-depth: 0
+      - run: ./release/verify.sh
 
   gates:
     uses: ./.github/workflows/gates.yml

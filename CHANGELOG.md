@@ -5,7 +5,12 @@ one SemVer stream, exact-tag pins, MAJOR = anything that can turn a consumer's
 green CI red without the consumer editing anything. While on `0.x`, breaking
 changes may land in any release.
 
-## v3.1.0 — 2026-08-04
+Changes land under `## Unreleased`; `release/cut.sh` renames that heading to the
+version being cut and opens a fresh one. The date on a section is the date the
+release was cut, and every section from `v3.1.0` on is also the body of that
+version's [GitHub Release](https://github.com/ColorMath/ci/releases).
+
+## Unreleased
 
 MINOR. Three new plugin skills and a new vendored file are additive per
 [LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
@@ -44,10 +49,59 @@ red, which is the test that makes a release MAJOR.
   Harmless so far purely by luck: `audit-deps.sh`, `migrations-sync.sh` and
   `diff-coverage.sh` are byte-identical between `v2.0.0` and `v3.0.0`. The
   first script change would have made local and CI disagree with no signal.
-  `COLORMATH_REF` is corrected to `v3.0.0`, LIFECYCLE step 2 now names both,
-  and a `refs-lockstep` job in colormath's own CI fails the PR when they
-  disagree — machinery rather than a checklist habit, because the checklist
-  already had the step and it was still missed.
+
+  The `refs-lockstep` job added here was the right instinct and the wrong
+  check. It compared the two stamps to *each other* and never asked whether the
+  ref resolved — so when this release was stamped `v3.1.0` before the tag
+  existed, it passed while every consumer's `make preflight` would have 404'd
+  on every gate script. See the release-machinery entry below, which replaces
+  it and makes hand-stamping impossible in the first place.
+
+- **Releases are now atomic** (`release/`, `.github/workflows/release.yml`,
+  `.github/workflows/ci.yml`, `LIFECYCLE.md`). Releasing was a six-step
+  checklist, and the steps came apart. An audit of all sixteen published tags
+  found nine internally inconsistent: `v2.1.0` through `v2.4.0` each ship a
+  `gates.yml` that fetches its gate scripts from `v2.0.0`, and `v3.0.0`'s
+  `Makefile.colormath` points three releases back. This release was itself
+  stamped into `main` and written up here without ever being tagged, leaving
+  `main` advertising a ref that 404s.
+
+  The root cause was stamping *forward*: a human wrote the next version into
+  the tree days before the tag existed, and the window between the two closed
+  only if they remembered. Stamps now move only in the release commit, which is
+  tagged with the version it stamps in a single `git push --atomic` — git
+  updates both refs or neither, so the window is gone rather than merely
+  shortened. In steady state `main` is stamped at the last released tag and
+  every ref in it resolves.
+
+  `release/cut.sh` is the one gesture: it refuses to start unless the tree is
+  clean, synced with `origin/main`, and green in CI; stamps; re-verifies;
+  commits; creates an *annotated* tag (the history alternates between
+  lightweight and annotated); pushes atomically; then publishes the GitHub
+  Release from this file's section for that version. A rejected push rolls the
+  local commit and tag back, and a failure after the push is resumable, because
+  publishing is idempotent.
+
+  `release/verify.sh` replaces `refs-lockstep` in CI and is a strict superset:
+  it covers `plugin.json` — a stamp site nothing checked, and which had been
+  missed twice — asks whether the stamped ref *resolves*, and requires
+  `example/`'s vendored copies to stay byte-identical to the root ones.
+  `--audit-all` produced the drift table above and stays advisory, because
+  published tags are never rewritten.
+
+- **Documentation no longer names a version** (`README.md`,
+  `.github/workflows/gates.yml`, `.github/workflows/review.yml`). Nine
+  copy-paste pins had rotted — the README told consumers to pin `@v2.0.0` and
+  the two workflow usage-comments said `@v1.1.0` and `@v1.0.0`, while the repo
+  was on `v3.1.0`. They now read `@vX.Y.Z` and point at
+  `/releases/latest`, and `verify.sh` fails the PR if a concrete version
+  reappears. Automating the stamping of prose would have worked; deleting the
+  data was cheaper and cannot regress.
+
+- **Every tag has a GitHub Release.** All sixteen were bare; the notes existed
+  only here. `release/backfill-releases.sh` created them retroactively from
+  this file, and `cut.sh` creates them going forward, so
+  `/releases/latest` is now a real answer to "what should I pin to?"
 
 ### Changed
 

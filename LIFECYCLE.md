@@ -42,25 +42,70 @@ contractual at `v1.0.0`.
 1. Land the change on `main` via PR — colormath's own CI (the gate suite
    running against `example/`) must be green. If the change touches the gates'
    behavior, `example/` must be updated in the same PR to keep it passing.
-2. **Stamp both refs** to the tag you are about to cut:
-   - the `colormath-ref` input default in `.github/workflows/gates.yml` — how
-     the workflow fetches its own matching scripts/actions in consumer repos;
-   - `COLORMATH_REF` in `Makefile.colormath` — how the *local* mirror fetches
-     those same scripts, so `make preflight` runs what CI runs.
-
-   They must match, and CI's `refs-lockstep` job fails the PR when they don't.
-   Miss the second and preflight silently runs an older gate script than CI —
-   invisible until a script changes between the two tags.
-3. Update `CHANGELOG.md` (with Upgrade notes if MAJOR).
-4. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-5. **Canary**: bump talas first (PR with the new `@vX.Y.Z`), merge when its
+   Write the release notes under `## Unreleased` in `CHANGELOG.md` as you go
+   (with Upgrade notes if MAJOR). **Never stamp a version by hand.**
+2. Cut it: run the **Release** workflow with the version, or locally
+   `./release/cut.sh vX.Y.Z` (`--dry-run` first to see the diff). That stamps
+   every version site, dates the changelog section, commits, creates an
+   annotated tag, pushes both atomically, and publishes the GitHub Release.
+3. **Canary**: bump talas first (PR with the new `@vX.Y.Z`), merge when its
    gates are green, let one staging deploy soak.
-6. Then intendent, then runwayz — runwayz always last (furthest from the
+4. Then intendent, then runwayz — runwayz always last (furthest from the
    template; its bump PRs are where weird interactions surface, and by then
    the release is proven).
 
-This is a checklist habit, not machinery. The automated bump workflow
-(`colormath-bump.yml` in each consumer) arrives with the Copier channel.
+Steps 3–4 stay human. Everything before them is machinery, because the
+checklist that used to cover them had the steps written down and they were
+still missed. The automated bump workflow (`colormath-bump.yml` in each
+consumer) arrives with the Copier channel.
+
+### The invariant
+
+> On `main`, at every commit: every version this repo writes down agrees, equals
+> the newest tag reachable from `HEAD`, and that tag exists.
+
+Consumers pin exact tags, and the stamps are how colormath fetches its own
+scripts at that pin. Break the invariant in one direction — a stamp naming a
+tag that does not exist yet — and every consumer's `make preflight` 404s on
+every gate script. Break it in the other — a stamp naming an older tag — and CI
+and the local mirror silently run different gate scripts, wrong only once a
+script changes between the two. Both have happened here. Nine of the sixteen
+tags up to `v3.0.0` are internally inconsistent (`release/verify.sh
+--audit-all` prints the table).
+
+The cause was stamping *forward*: writing the next version into the tree days
+before the tag existed, leaving a window that closed only if someone
+remembered. So **stamps move only in the release commit**, which is tagged with
+the version it stamps in a single `git push --atomic` — git updates both refs
+or neither. There is no window to forget about, and the invariant is therefore
+true continuously, including on the release commit itself.
+
+That is what makes `release-consistency` safe to run as a blocking check in CI,
+despite the warning under [Drift detection](#drift-detection-steady-state)
+below: it can only fail on a PR that edited a version string. A PR that touches
+none of them inherits main's consistent state and passes unconditionally, so it
+can never stand between a hotfix and `main`.
+
+Documentation examples are deliberately **not** stamped — they read `@vX.Y.Z`
+and point at `/releases/latest`. Nine of them had rotted to versions one to
+three majors stale. Deleting the data beat automating it.
+
+### When a release goes wrong
+
+Re-running is always safe. `cut.sh` refuses to start from an inconsistent tree,
+rolls back its own commit and tag if the atomic push is rejected, and resumes at
+the publish step if the tag landed but the GitHub Release did not.
+
+**Never move or delete a published tag.** Not `git tag -f`, not delete-and-
+recreate. A consumer that already fetched it gets `would clobber existing tag`
+on their next fetch, and cached CI runners go nondeterministic — this repo
+exists to not do that to consumers. If a release is wrong, burn the version:
+cut the next one immediately and edit the bad Release's body to lead with
+**WITHDRAWN — use vX.Y.Z+1**. That costs one integer and stays honest.
+
+Tags at and below `v3.0.0` are a mix of lightweight and annotated, and several
+are internally inconsistent. Both are historical artifacts, left alone on
+purpose. Every tag from `v3.1.0` on is annotated and verified before it exists.
 
 ## Propagation (steady state, once Copier lands)
 
