@@ -12,6 +12,8 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+## v3.1.0 — 2026-08-04
+
 MINOR. Three new plugin skills and a new vendored file are additive per
 [LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
 for anyone with the old command in their fingers — cannot turn a consumer's CI
