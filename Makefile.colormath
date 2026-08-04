@@ -17,9 +17,11 @@
 #   - config lives where CI reads it: .colormath/audit.conf, [tool.bandit] /
 #     [tool.interrogate] / [tool.djlint] in pyproject.toml, npm scripts
 #     `jslint`/`styles`/`a11y`, optional .gitleaks.toml
+#   - your AGENTS.md imports the vendored AGENTS.colormath.md, so agents pick
+#     up the gate, shipping and guardrail conventions from one shared copy
 # ----------------------------------------------------------------------------
 
-COLORMATH_REF = v3.0.0
+COLORMATH_REF = v3.1.0
 COLORMATH_RAW = https://raw.githubusercontent.com/ColorMath/ci/$(COLORMATH_REF)
 
 # Overridable knobs — set before the include if your project differs.
@@ -138,4 +140,5 @@ colormath-update: ## Refresh the vendored colormath files: make colormath-update
 	@test -n "$(REF)" || { echo "usage: make colormath-update REF=vX.Y.Z" >&2; exit 1; }
 	curl -fsSL "https://raw.githubusercontent.com/ColorMath/ci/$(REF)/Makefile.colormath" -o Makefile.colormath
 	curl -fsSL "https://raw.githubusercontent.com/ColorMath/ci/$(REF)/eslint.config.colormath.mjs" -o eslint.config.colormath.mjs
-	@echo "Makefile.colormath + eslint.config.colormath.mjs refreshed to $(REF) — bump the gates.yml pin to match."
+	curl -fsSL "https://raw.githubusercontent.com/ColorMath/ci/$(REF)/AGENTS.colormath.md" -o AGENTS.colormath.md
+	@echo "Makefile.colormath + eslint.config.colormath.mjs + AGENTS.colormath.md refreshed to $(REF) — bump the gates.yml pin to match."

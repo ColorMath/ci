@@ -14,6 +14,7 @@ It also doubles as the reference for the consumer-side contract:
 - `.colormath/audit.conf` — pip-audit groups + CVE allowlist read by the `deps` gate
 - `.colormath/ci.env` — env sourced before pytest in CI
 - `Dockerfile` — a hadolint-clean image for the `dockerfile` gate (never built by the suite)
+- `AGENTS.md` + vendored `AGENTS.colormath.md` — the agent-docs contract: app-specific facts locally, shared colormath conventions imported from the vendored copy
 
 Keep it small. If a gate needs new surface to test, add the least code that
 exercises it.

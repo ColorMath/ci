@@ -172,6 +172,7 @@ All inputs are optional.
 | npm scripts `test`, `jslint`, `styles`, `a11y` | the JS gates | see [example/package.json](example/package.json) |
 | `eslint.config.js` + vendored `eslint.config.colormath.mjs` | `jslint` | thin caller of the shared eslint base ([reference](example/eslint.config.js)); devDeps `eslint`, `@eslint/js`, `globals` |
 | `Dockerfile` | `dockerfile` | linted by hadolint ([reference](example/Dockerfile)) |
+| `AGENTS.md` + vendored `AGENTS.colormath.md` | agents | app-specific facts locally, shared colormath conventions imported ([reference](example/AGENTS.md)) |
 | `.colormath/ci.env` | optional | non-secret env sourced before pytest in CI |
 | `.colormath/ci-extra-install.sh` | optional | extra install steps after `poetry install` (must be executable) |
 | `.gitleaks.toml` | optional | gitleaks false-positive allowlist, used when present |
@@ -335,16 +336,19 @@ or have a consumer repo offer it to everyone who opens it, via
 
 ## Running the gates locally
 
-Two files are vendored into every consumer at the pinned tag:
+Three files are vendored into every consumer at the pinned tag:
 [Makefile.colormath](Makefile.colormath) (a local mirror of every gate, so
-all consumers share the same `make` endpoints) and
+all consumers share the same `make` endpoints),
 [eslint.config.colormath.mjs](eslint.config.colormath.mjs) (the shared eslint
 base — your `eslint.config.js` stays a thin caller; see its header for the
-factory options and escape hatches). Vendor them once:
+factory options and escape hatches), and
+[AGENTS.colormath.md](AGENTS.colormath.md) (the shared agent conventions — see
+[Agent docs](#agent-docs) below). Vendor them once:
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/Makefile.colormath
 curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/eslint.config.colormath.mjs
+curl -fsSLO https://raw.githubusercontent.com/ColorMath/ci/v2.0.0/AGENTS.colormath.md
 ```
 
 then include the Makefile from yours, providing the one target it expects
@@ -366,8 +370,40 @@ Now every gate has a same-named `make` mirror (`make jslint`, `make audit`,
 caller disables. The `audit` and `coverage-diff` targets fetch their gate
 scripts from this repo at the file's own stamped tag, so local runs and CI
 share one implementation. On upgrades, `make colormath-update REF=vX.Y.Z`
-refreshes both vendored files — keep them in lockstep with your `gates.yml`
-pin, and review the diff like any other dependency bump.
+refreshes all three vendored files — keep them in lockstep with your
+`gates.yml` pin, and review the diff like any other dependency bump.
+
+## Agent docs
+
+Coding agents need the same facts the gate table above gives a human: which
+gates exist, when to run preflight, how a branch ships, what never to touch.
+Written per-repo, those facts drift — four apps end up with four descriptions
+of one gate suite, and the stale ones are indistinguishable from the current
+ones.
+
+[AGENTS.colormath.md](AGENTS.colormath.md) is that content, vendored like the
+other two files and refreshed by the same `make colormath-update`. Your own
+`AGENTS.md` keeps only what is true of your app — domain, commands, ports,
+architecture, local conventions — and imports the shared half:
+
+```markdown
+# YourApp
+
+One paragraph on what this app is and what it's built from.
+
+Shared colormath conventions (CI gates, shipping, guardrails): @AGENTS.colormath.md
+
+## Commands
+…
+```
+
+The import line is written as a sentence on purpose: `@path` is Claude Code
+syntax, and an agent that doesn't resolve it still reads a usable pointer.
+
+Two things deliberately stay in *your* `AGENTS.md`, because the shared copy
+cannot know them: which gates your caller disables (that lives in `gates.yml`
+and `COLORMATH_PREFLIGHT_SKIP`, which are the authority), and where your design
+tokens live. [example/AGENTS.md](example/AGENTS.md) shows the wiring.
 
 ## Versioning and upgrades
 
@@ -392,6 +428,7 @@ While on `0.x`, breaking changes may land in any release.
 plugin/                        # the colormath Claude Code plugin (skills)
 Makefile.colormath             # shared local gate targets — vendored by consumers
 eslint.config.colormath.mjs    # shared eslint base — vendored by consumers
+AGENTS.colormath.md            # shared agent conventions — vendored by consumers
 scripts/                       # gate scripts, fetched by the workflow at its own ref
 example/                       # minimal compliant consumer + contract reference
 docs/                          # adoption notes for the maintainer's own products

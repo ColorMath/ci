@@ -5,9 +5,9 @@ one SemVer stream, exact-tag pins, MAJOR = anything that can turn a consumer's
 green CI red without the consumer editing anything. While on `0.x`, breaking
 changes may land in any release.
 
-## Unreleased
+## v3.1.0 — 2026-08-04
 
-MINOR when cut. Three new plugin skills are additive per
+MINOR. Three new plugin skills and a new vendored file are additive per
 [LIFECYCLE.md](LIFECYCLE.md), and the skill rename below — while a real break
 for anyone with the old command in their fingers — cannot turn a consumer's CI
 red, which is the test that makes a release MAJOR.
@@ -68,6 +68,34 @@ red, which is the test that makes a release MAJOR.
   this release; product copy that tells users to run it is the likely hit.
 
 ### Added
+
+- **`AGENTS.colormath.md`** — a third vendored file, alongside
+  `Makefile.colormath` and `eslint.config.colormath.mjs` and refreshed by the
+  same `make colormath-update`. It carries the half of a consumer's agent docs
+  that is identical in every colormath app: what being a colormath app means,
+  the sixteen gates with their local `make` mirrors and how to pass each, the
+  preflight rhythm, the `/colormath:ship` pipeline, the layering and
+  design-token and docstring conventions, the ADR practice, and the guardrails
+  (never hand-edit the vendored files, never push to the default branch, never
+  touch `.env`, justify every CVE ignore).
+
+  The problem it solves is drift, and the drift was already there. Surveying
+  four consumers, the gate suite was documented four ways — sixteen gates, nine
+  gates, nine gates, seven gates — and one repo's doc named two disabled gates
+  that were not the two its `gates.yml` actually disables. Each copy was right
+  when written, and nothing marks the ones that stopped being right.
+
+  Consumers keep an `AGENTS.md` of their own and import this one from it
+  (`@AGENTS.colormath.md`), so app-specific facts stay app-specific. Two things
+  deliberately do *not* move here: which gates a consumer disables — that is
+  `enable-<gate>: false` plus `COLORMATH_PREFLIGHT_SKIP`, and prose about them
+  is exactly what went stale — and where a consumer's design tokens live. The
+  shared file states the rule and points at the local file for the value.
+
+  Additive: nothing reads it in CI and no gate, input or target changes. A
+  consumer that never vendors it is unaffected; one that does gets the file on
+  its next `colormath-update`, and wires up the import in that same PR.
+  `example/` carries the wiring as the reference.
 
 - **`/colormath:refine-initiative`** (`plugin/skills/refine-initiative/`) — the
   layer above `refine-ticket`. Takes an initiative, reads its feature
