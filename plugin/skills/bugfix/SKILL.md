@@ -1,8 +1,8 @@
 ---
 name: bugfix
-description: Take a bug report all the way from raw report to merged fix — establish the facts the report left out (which environment, which surface, the literal repro), reproduce the defect against the running stack, fix it at the layer the invariant belongs to, add a regression test that fails without the fix, assess whether the defect already corrupted stored data and remediate that in the same PR, then hand off to /colormath:ship. Use this whenever someone reports something broken — a bug report, a pasted stack trace or error log, "why is X doing Y", "users can't Z", a production incident, a written-up findings doc — even when they never say the word "bug". Not for sweeping a whole feature area for unknown problems (that's /colormath:qa), and not for shipping a branch that's already fixed (that's /colormath:ship).
-argument-hint: [the bug report — prose, a pasted error/log, or a path to a report file]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion
+description: Take a bug report all the way from raw report to merged fix — establish the facts the report left out (which environment, which surface, the literal repro), reproduce the defect against the running stack, fix it at the layer the invariant belongs to, add a regression test that fails without the fix, assess whether the defect already corrupted stored data and remediate that in the same PR, then hand off to /colormath:ship. Use this whenever someone reports something broken — a ticket key for a filed bug, a bug report, a pasted stack trace or error log, "why is X doing Y", "users can't Z", a production incident, a written-up findings doc — even when they never say the word "bug". Not for sweeping a whole feature area for unknown problems (that's /colormath:qa), and not for shipping a branch that's already fixed (that's /colormath:ship).
+argument-hint: [a ticket key (CM-00012), or the report itself — prose, a pasted error/log, or a path to a report file]
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
 ---
 
 Turn the bug report in "$ARGUMENTS" into a merged fix.
@@ -21,10 +21,30 @@ So the spine is: **understand → reproduce → diagnose → fix → prove → r
 → ship.** Don't skip forward. In particular, don't start editing code before
 you have watched the bug happen.
 
-If "$ARGUMENTS" points at a file (a written-up report, an exported ticket, a
-QA findings doc), read the whole thing first. If it's a stack trace or a log
-excerpt, that's your best evidence — work backwards from the frames to the code
-path, but treat the trace as the *symptom's* location, not the defect's.
+**First, work out what you were handed.** A bug arrives in one of three
+shapes, and they start differently:
+
+- **A ticket key** (`CM-00012`, `cm-12` — case and zero-padding don't matter).
+  Call `mcp__abacus__get_ticket`, which takes the key directly. Read the whole
+  thing: description, type, **every comment**, and the plan and QA plan if
+  somebody groomed it. The comments are where the report actually lives once a
+  bug has been discussed — the reproduction somebody finally landed on, the
+  environment it was seen in, the "actually it also happens when…" that never
+  made it into the description. A bug filed as a ticket has usually been talked
+  about, and skipping the thread is how you re-derive what the thread already
+  settled. If "$ARGUMENTS" is a title fragment rather than a key, find it with
+  `list_boards` then `list_tickets`, and confirm which one you landed on before
+  doing anything else.
+- **A file** — a written-up report, an exported ticket, a QA findings doc. Read
+  the whole thing first.
+- **Prose, a stack trace, or a log excerpt**, pasted straight in. A trace is
+  your best evidence: work backwards from the frames to the code path, but
+  treat it as the *symptom's* location, not the defect's.
+
+Whichever it was, the ticket or the report is still **evidence rather than a
+specification**, and step 1 applies unchanged. A filed ticket is not more
+authoritative than a pasted paragraph — it is the same claim with a number on
+it, and the same things are missing from it.
 
 ## 1. Read the report, then find what's missing
 
@@ -227,5 +247,11 @@ anything you deliberately left for a human.
   problems get written down and mentioned, not folded into the diff.
 - Local state is yours to mutate while reproducing — record a baseline first so
   you can put it back, and clean up the rows, files and credentials you created.
+- **If it came from a ticket, close the loop on it.** When ship comes back,
+  `add_comment` with the outcome — the PR link, whether it merged or is held,
+  the cause you found, and what you deliberately left alone. Leave the ticket's
+  own fields alone: the description is what was reported, and the comment is
+  what happened. Do not move it between lanes; lane meaning is per board and
+  the person who filed it decides when it is done.
 - Your job ends where `/colormath:ship` takes over, and ship's own rules apply
   from there.
