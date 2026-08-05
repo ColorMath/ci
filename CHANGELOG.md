@@ -12,6 +12,46 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+MINOR. A skill gains an input shape it did not have; nothing that worked before
+works differently.
+
+### Changed
+
+- **`bugfix` now takes a ticket key as well as a pasted report.**
+  `/colormath:bugfix CM-00012` reads the ticket over MCP — description, type,
+  every comment, and the plans if it was groomed — instead of needing the report
+  pasted in. Prose, a stack trace and a path to a report file all behave exactly
+  as before; the skill now branches on which of the three shapes it was handed.
+
+  The gap this closes is that a bug usually **is** a ticket by the time somebody
+  fixes it. `refine-ticket`, `implement-ticket`, `refine-initiative` and
+  `plan-initiative` all take a key; `bugfix` was the odd one out, so the only
+  way to hand it a filed bug was to copy the description out of the tracker —
+  which silently drops the comment thread, where a filed bug's actual
+  reproduction usually ends up.
+
+  Reading the thread is the point, not a side effect: the skill is told to read
+  **every comment**, because the environment, the repro somebody finally landed
+  on, and the "it also happens when…" are typically there rather than in the
+  description. What it must not do is treat a numbered ticket as more
+  authoritative than a pasted paragraph — step 1 ("find what's missing") applies
+  unchanged either way.
+
+  It also closes the loop: when a run started from a ticket, the skill now
+  `add_comment`s the outcome — PR link, merged or held, the cause, and what it
+  deliberately left alone — matching what `implement-ticket` already does. It
+  leaves the ticket's own fields and lane alone; the description is what was
+  reported, the comment is what happened, and whether a bug is done is the
+  filer's call.
+
+  `allowed-tools` gains `mcp__abacus__get_ticket`, `list_boards`, `list_tickets`
+  and `add_comment` — the same read set `refine-ticket` carries, plus the
+  comment write. A consumer with no abacus MCP server configured is unaffected:
+  the pasted-report path never touches those tools.
+
+  Downstream, this makes `/colormath:bugfix <key>` a command a tracker can print
+  next to a bug and have somebody run as-is, which it could not before.
+
 ## v3.1.0 — 2026-08-04
 
 MINOR. Three new plugin skills and a new vendored file are additive per
