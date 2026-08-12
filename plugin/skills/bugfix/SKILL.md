@@ -221,7 +221,7 @@ Ask: could this defect have written bad rows, files, or cached values? If so:
 - Run the repo's full local gate mirror once (`make preflight`) before handing
   off, so an avoidable failure doesn't cost a CI round trip.
 - Then invoke `/colormath:ship`, which takes it the rest of the way: PR, gates,
-  review, the generated test plan executed against the running stack, fixes for
+  review, the ticket's QA plan executed against the running stack, fixes for
   anything that turns up, and either an auto-merge when it's genuinely clean or
   a hold with the reason.
 

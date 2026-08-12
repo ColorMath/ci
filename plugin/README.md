@@ -28,20 +28,21 @@ recommendation:
    review workflow. Knows the review's failure modes (e.g. the
    workflow-validation guard when a PR edits the review caller itself) and
    reports them instead of treating silence as a clean review.
-4. **Execute the test plan** — waits for the `review / test-plan` check, reads
-   the `## Test Plan` comment and its machine-readable verdict (`qa_depth` /
-   `requires_ui_qa` / `requires_api_qa`), then runs the UI/API QA checklists
-   against the **running** stack — reusing the `qa` skill's recon + verify
-   discipline, scaling effort by `qa_depth`, driving a browser for UI items
-   when one is reachable and marking them `⚠️` unverified when not. Posts a
-   `## Test Plan · Results` comment checking off each item with the evidence it
-   observed; `❌` findings feed the fixes in step 5. Skipped in repos without
-   the review workflow.
+4. **QA against the ticket's plan** — resolves the ticket from the branch, PR
+   and commits, then reads its `qa_plan` from Abacus and runs it against the
+   **running** stack, reusing the `qa` skill's recon + verify discipline and
+   driving a browser for UI items when one is reachable (marking them `⚠️`
+   unverified when not). If the ticket has no `qa_plan` it **writes one** into
+   the field, marked as ship-authored; if the plan is stale it amends it in a
+   ticket *comment* rather than editing the groomed field; if there is no ticket
+   at all it drafts the plan in the PR. Posts a `## QA Results` comment — and
+   mirrors it to the ticket — checking off each item with the evidence it
+   observed; `❌` findings feed the fixes in step 5. Never skipped.
 5. **Fix every finding — blockers included** — fixes every review finding and
-   every `❌` QA finding it can, **without asking**, in iterative rounds
-   (re-verifying each repro against the running stack, re-triggering the review
-   with `@claude` once when fixes are substantive), and posts the **Addressed /
-   Not changed** response comment. Only findings that genuinely need a human — a
+   every `❌` QA finding it can, **without asking**, re-verifying each repro
+   against the running stack, and posts the **Addressed / Not changed** response
+   comment. It never re-triggers the review — that loop has no exit condition.
+   Only findings that genuinely need a human — a
    design decision, or a `CHANGES_REQUESTED` structural call — are deferred.
 6. **Restore** — undoes any local state step 4 mutated (rows, files, minted
    credentials, flipped config), and shows you the restored baseline.
@@ -63,9 +64,11 @@ PR comment first) — otherwise it holds and explains.
   the `gates / *` check names it produces.
 - Optional: the colormath review caller (job named `review`, per the adoption
   docs) — step 3 keys on the `review / review` check and the
-  `## Thermonuclear Review` comment marker; step 4 keys on the
-  `review / test-plan` check and the `## Test Plan` comment (with its
-  `<!-- colormath-test-plan -->` / `<!-- testplan … -->` verdict markers).
+  `## Thermonuclear Review` comment marker. Without it, step 7 always holds:
+  QA alone does not carry a merge.
+- The Abacus MCP server, for step 4's `qa_plan` lookup and write-back. Without
+  it the step still runs — ship drafts the plan in the PR — but nothing is read
+  from or recorded on the ticket.
 - For step 4, a locally runnable stack (run commands + ports in
   `AGENTS.md` / `CLAUDE.md`) and seeded accounts — same prerequisites as
   `/colormath:qa`, whose `references/` it reuses. A browser is optional: UI
@@ -352,8 +355,9 @@ this is where it meets the code:
 5. **Execute the QA plan against the running stack** — every item gets an
    observation, `⚠️` when no browser is reachable for a UI item, and a failure is
    fixed and re-run rather than shipped with the document claiming it passed.
-6. **Ship** — `make preflight`, then `/colormath:ship` for PR, gates, review,
-   test plan and the merge decision. Comments the outcome back onto the ticket.
+6. **Ship** — `make preflight`, then `/colormath:ship` for PR, gates, review, a
+   second pass over the same QA plan, and the merge decision. Comments the
+   outcome back onto the ticket.
 
 It leaves the ticket's own fields alone: `plan` and `qa_plan` are the record of
 intent, the comment is the record of what happened. It does not move tickets

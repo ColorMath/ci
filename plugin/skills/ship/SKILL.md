@@ -1,26 +1,26 @@
 ---
 name: ship
-description: Open a PR, wait for gates + review + test plan, execute the test plan against the running stack, fix every finding (blockers included), then decide once — auto-merge when clean, or hold for a human. Never re-triggers the review.
+description: Open a PR, wait for the gates and the review, then QA the change against a running stack from the ticket's QA plan in Abacus (writing one if the ticket has none), fix every finding — blockers included — then decide once, auto-merging when clean or holding for a human. Never re-triggers the review.
 argument-hint: [optional PR title]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
 model: claude-sonnet-4-6
 ---
 
 Ship the current branch through the PR pipeline end to end. This repo uses
-the colormath (ColorMath/ci) gates and, optionally, its review workflow — which
-runs two agents in parallel: the thermonuclear **review** and a **test plan**
-that you then execute against the running stack. You **fix** what the review
-and the QA turn up — blockers included, without asking — and end at a **merge
-decision** that either auto-merges the PR (when it's genuinely clean) or holds
-and asks for a human. Use the `gh` CLI for every GitHub operation. Give me a
-one-line status at each step.
+the colormath (ColorMath/ci) gates and, optionally, its review workflow — the
+thermonuclear **review**. QA does not come from CI: the **QA plan lives on the
+ticket in Abacus**, and you execute it against a running stack. You **fix** what
+the review and the QA turn up — blockers included, without asking — and end at a
+**merge decision** that either auto-merges the PR (when it's genuinely clean) or
+holds and asks for a human. Use the `gh` CLI for every GitHub operation. Give me
+a one-line status at each step.
 
 The shape is linear and runs **once**: review → respond + QA → decide. There is
 no second review round; see step 5.
 
 Broad `Bash` is in `allowed-tools` on purpose: step 4 drives the local stack
 (`make up`, DB queries, `curl`, throwaway driver scripts) to actually run the
-test plan, which no narrow `gh`/`git` allowlist can cover.
+QA plan, which no narrow `gh`/`git` allowlist can cover.
 
 ## 1. Open the PR
 - Push the branch if needed (`git push -u origin HEAD`).
@@ -45,16 +45,13 @@ test plan, which no narrow `gh`/`git` allowlist can cover.
 ## 3. Poll until a review lands
 First check whether this repo runs the colormath review workflow: look for a
 workflow under `.github/workflows/` whose job `uses:`
-`ColorMath/ci/.github/workflows/review.yml`. If there is none, skip step 4 (no
-test plan is generated either) and go straight to step 5 with whatever formal
-reviews exist; say explicitly that no automated review is configured. Note for
-step 7: with no automated review + QA to stand on, the merge decision **holds** —
-it does not auto-merge a PR it couldn't verify.
+`ColorMath/ci/.github/workflows/review.yml`. If there is none, go straight to
+step 4 with whatever formal reviews exist and say explicitly that no automated
+review is configured. Note for step 7: with no automated review to stand on, a
+clean QA run is not on its own enough — the merge decision **holds**.
 
-That workflow also runs a **third** parallel agent — the test-plan agent
-(check `review / test-plan`, comment marked `## Test Plan`). It is neither a
-review nor a gate; step 4 waits for it and executes it. Don't confuse its
-check or comment with the review's here.
+QA is **not** part of this workflow and never blocks this step. It comes from
+the ticket in Abacus, and step 4 owns it end to end.
 
 Two reviewers may weigh in, and they land in **different places** — know which
 is which or you'll wait forever on the wrong one:
@@ -101,39 +98,50 @@ done
   don't read is a finding you'll miss; relay every one to me, including the
   ones buried below the summary header.
 
-## 4. Execute the test plan
-The test-plan agent runs in parallel with the review and posts its own PR
-comment — a concrete QA checklist specific to this diff. Your job here is to
-**run it against the running stack and report what actually happened**, the
+## 4. QA the change against the ticket's QA plan
+QA is owned by the **ticket**, not by CI. Your job here is to get the QA plan,
+**run it against the running stack, and report what actually happened** — the
 same principle the `qa` skill is built on: a checklist item is a claim about a
 running system and only counts once you've watched the system confirm or break
 it. A green gate suite does not exercise the rendered UI or most request/
-response behavior — that gap is exactly what this plan covers.
+response behavior, which is exactly the gap this covers.
 
-If no colormath review workflow is configured (step 3), there is no test plan;
-skip this step and say so.
+**Find the ticket.** Look for a key like `CM-00012` / `ID-00031` (the board's
+own prefix, then digits) in the branch name, the PR title and body, and the
+branch's commit messages. Confirm it with `mcp__abacus__get_ticket`, which takes
+the key directly — case and padding don't matter. If only a title fragment
+turns up, resolve it via `list_boards` / `list_tickets` and confirm which ticket
+you landed on. Two rules on what counts:
+- An **initiative** is the wrong altitude and a **task** carries no plans by
+  design. Neither is the ticket for this PR — treat it as no ticket.
+- If you cannot say with confidence *which* ticket this PR implements, you do
+  not have one. Guessing writes QA onto somebody else's ticket.
 
-**Wait for it, then read all of it.**
-- Wait until the `review / test-plan` check completes (it may already be done —
-  it runs alongside the review). Poll `statusCheckRollup` every 30s, the same
-  way step 3 does (read the check by `.name=="review / test-plan"`; do **not**
-  awk `gh pr checks` columns — `$1`/`$2` get clobbered by skill-argument
-  substitution).
-- If the check concluded `FAILURE` and **no** `## Test Plan` comment exists, the
-  agent errored before posting — say so and do not treat the absence of a plan
-  as "nothing to test."
-- Read the **full** comment body — never truncate (no `--jq '.body[0:N]'`, no
-  `head`). Pull the latest test-plan comment by its hidden marker:
-  ```bash
-  PR=<number>
-  gh pr view "$PR" --json comments \
-    --jq '[.comments[] | select(.body | contains("<!-- colormath-test-plan -->"))] | last | .body'
-  ```
-- Parse the machine-readable verdict from the hidden marker line
-  `<!-- testplan qa_depth=<low|medium|high> requires_ui_qa=<bool> requires_api_qa=<bool> -->`.
-  It tells you the scope: skip a checklist section the plan marked N/A, and let
-  `qa_depth` set your effort (a `low` copy tweak is a couple of checks; a `high`
-  auth/migration change earns the full matrix).
+Then take exactly one of three paths:
+
+**a. The ticket has a `qa_plan`.** Execute it as written — that plan was groomed
+and reviewed, and it is the acceptance criteria this change was built against.
+If it has gone stale (a step names a file that moved, a case the diff made
+irrelevant, a gap the diff opened), **do not edit the field**. Record the
+amendment as a ticket comment via `mcp__abacus__add_comment`, saying what you
+changed and why, and execute the amended version. The `qa_plan` field stays the
+record of what was intended; comments are the record of what happened.
+
+**b. The ticket has no `qa_plan`.** Write one, then execute it. Draft it from
+the diff the way `refine-ticket` would — concrete, independently checkable
+items naming real routes, roles and expected results, not generic boilerplate;
+cover the authorization tiers the change touches, and say plainly what CI
+already covers so you don't re-test it. Write it to the ticket's `qa_plan` field
+with `mcp__abacus__update_ticket`, opening it with a line that marks its
+provenance so a later reader never mistakes it for a groomed plan:
+
+    _Authored by /colormath:ship while shipping PR #<n> — not groomed._
+
+Pass only that field. Then execute it.
+
+**c. There is no ticket.** Draft the same kind of plan and execute it, but it
+lives in the PR alone — never invent a ticket to hold it. Say plainly in your
+status line and in the results comment that no ticket backed this QA.
 
 **Set up like the `qa` skill does.** Read that skill's `references/recon.md`
 before touching anything: bring the stack up **only if it isn't already
@@ -169,25 +177,32 @@ environment. A dev `.env` often holds a *live* key, so "it's only the dev
 stack" is not a reason to assume a send won't actually deliver. Offer to
 redirect locally instead.
 
-**Post the results back to the PR.** Add one comment led by exactly this marker
-so it's findable and idempotent (edit the existing one on a re-run rather than
+**Post the results to the PR.** Add one comment led by exactly this marker so
+it's findable and idempotent (edit the existing one on a re-run rather than
 stacking duplicates):
 
-    ## Test Plan · Results
+    ## QA Results
 
-Under it, reproduce the plan's checklist with each item marked `✅` pass, `❌`
-fail, or `⚠️` unverified (with the reason — e.g. "no browser available"), each
-carrying the concrete evidence you observed (the request + response, the
-screen state, the row you read). Then a short **Findings** list of every `❌`,
-worst first, with its blast radius and the exact repro; and a one-line note of
-what you did **not** cover. If everything passed, say so explicitly. Never
-truncate a finding.
+Under it, name the plan's provenance in one line — the ticket key it came from,
+or that you wrote it (and whether a ticket backed it) — then reproduce the
+checklist with each item marked `✅` pass, `❌` fail, or `⚠️` unverified (with the
+reason — e.g. "no browser available"), each carrying the concrete evidence you
+observed (the request + response, the screen state, the row you read). Then a
+short **Findings** list of every `❌`, worst first, with its blast radius and the
+exact repro; and a one-line note of what you did **not** cover. If everything
+passed, say so explicitly. Never truncate a finding.
+
+**Post the results to the ticket too**, when there is one: the same results as a
+ticket comment via `mcp__abacus__add_comment`, with the PR link. The ticket is
+where the QA plan lives, so it is where the plan's outcome belongs — a plan
+whose results only ever existed on a PR is a plan nobody can audit later. Post
+this now; step 5 updates it if fixes change the picture.
 
 Carry the `❌` findings into step 5 to be fixed, exactly like review findings.
 
 ## 5. Fix every finding — blockers included
 This is not a recommendation step: **fix, don't ask.** Work every finding from
-the review and every `❌` from your test-plan results — **Blockers included** —
+the review and every `❌` from your QA results — **Blockers included** —
 on this branch, matching the surrounding code's idiom and adding a regression
 test at the layer the finding lived at. A correctness or security Blocker is
 exactly the kind of thing to fix now, not defer.
@@ -210,14 +225,15 @@ Then close the loop:
   can't-auto-fix findings above.
 - Let the gates re-run green on the new commit.
 - Post the **Addressed / Not changed** response comment (see Rules), and update
-  the `## Test Plan · Results` comment to reflect the re-verified state.
+  the `## QA Results` comment — and the ticket comment mirroring it — to reflect
+  the re-verified state.
 
 **Do NOT re-trigger the review.** There is exactly **one** thermonuclear review
 per ship run, and you have already read it. Commenting `@claude` to ask for a
-fresh look is the one thing guaranteed to make this skill loop forever: a new
-review spawns a new test-plan agent, whose new plan asks for a fresh round of
-QA, whose fixes look "substantive" enough to justify another re-review. That
-loop has no exit condition and burns a full QA cycle each time round.
+fresh look is the one thing guaranteed to make this skill loop forever: a fresh
+review re-reads a diff you have already responded to, and its findings look
+"substantive" enough to justify another round of fixes, another QA pass over the
+plan, and another re-review. That loop has no exit condition.
 
 You do not need a reviewer to bless your fixes — **you** re-verified them
 against the running system, and the gates re-ran green on the new commit. That
@@ -234,7 +250,7 @@ config or feature flag you changed, and confirm the baseline from step 4
 matches. QA debris poisons the next run, and a flipped provider or flag left
 flipped is its own outage. Restoring does not erase the QA *result* you already
 recorded — step 7 still knows whether QA passed. Show me the restored state in
-your final report. (Skip if step 4 was skipped or you mutated nothing.)
+your final report. (Skip only if you mutated nothing.)
 
 ## 7. Merge decision — auto-merge, or hold and explain
 The go/no-go, and the one place this skill merges. Reach it directly from step
@@ -244,8 +260,10 @@ gates on the current commit.
 
 Evaluate three gates against the **current** state of the branch:
 
-1. **The review had no Blockers.** Judged from the thermonuclear review as
-   posted. If it raised even one **Blocker**, hold for a human — *even if you
+1. **A review ran, and had no Blockers.** Judged from the thermonuclear review
+   as posted. No review workflow configured, or a review that errored before
+   posting, fails this gate — a clean QA run does not substitute for it. If the
+   review raised even one **Blocker**, hold for a human — *even if you
    fixed it*. You still fix it in step 5; a Blocker simply means a person signs
    off on the merge rather than this skill. Suggestions and nits never block.
 2. **Every review finding is resolved or consciously dismissed.** Each one is
@@ -254,8 +272,8 @@ Evaluate three gates against the **current** state of the branch:
    decision or a structural rework (step 5's can't-auto-fix pair), and no formal
    human review sitting at `CHANGES_REQUESTED`. Gates are green on the latest
    commit.
-3. **QA ran, and every gap is explained.** The test plan executed — the stack
-   came up and you drove the items — with **no `❌` left standing**. A `⚠️` does
+3. **QA ran, and every gap is explained.** The QA plan executed — the stack came
+   up and you drove the items — with **no `❌` left standing**. A `⚠️` does
    **not** block *if* you can say plainly why it was skipped and why skipping is
    sound. Legitimate, explainable gaps look like:
    - "Didn't run `make clean` — it would drop the working dev database. Ran the
@@ -266,8 +284,10 @@ Evaluate three gates against the **current** state of the branch:
    What is **not** explainable, and does block: QA that never ran at all, a
    required UI item you couldn't drive because no browser was reachable, a stack
    that wouldn't come up, or a `⚠️` with no stated reason. "I didn't get to it"
-   is not an explanation. No review workflow at all → no test plan → this gate
-   fails.
+   is not an explanation. A missing ticket is **not** an excuse — step 4 writes a
+   plan when there is none, so "there was nothing to QA" never satisfies this
+   gate; only a change with no runtime surface at all does, and you say so
+   explicitly.
 
 **All three true → auto-merge.** Post a PR comment saying you are merging and
 why, naming the evidence: gates green, N findings addressed (0 Blockers), QA
@@ -296,17 +316,24 @@ the default branch.
   merge on a silent or failed review, or on QA that couldn't run.
 - **One review per run.** Read the thermonuclear review once (step 3), respond
   to it and do the QA (steps 4–5), then decide (step 7). Never comment `@claude`
-  to request a re-review — it spawns a fresh test plan and a fresh QA round, and
-  the cycle does not terminate.
-- **Whenever you push a commit that responds to a review or a test-plan
-  finding, post a PR comment** (`gh pr comment <number>`) detailing what you did
+  to request a re-review — it restarts fixes, QA and review in a cycle that does
+  not terminate.
+- **QA always runs.** A ticket without a `qa_plan`, or a PR without a ticket, is
+  a plan for you to write (step 4) — never a reason to skip QA.
+- **Never edit a ticket's `qa_plan` that already has content.** Filling an empty
+  one is writing down what was missing; changing a groomed one erases the
+  difference between what was intended and what was done. Amendments go on as
+  ticket comments. The same goes for `plan` and `description` — this skill does
+  not groom, and it does not create tickets.
+- **Whenever you push a commit that responds to a review or a QA finding, post a
+  PR comment** (`gh pr comment <number>`) detailing what you did
   and did not do: group it as **Addressed** (each finding + the change that
   resolved it) and **Not changed** (each finding you deferred + why). Reply on
   the relevant inline threads too, but the summary comment is required even when
   every finding was addressed.
-- The `## Test Plan · Results` comment (step 4) is separate from that response
-  comment and always required whenever a test plan ran — post the results even
-  when nothing failed. On a re-run, edit the existing results comment instead of
-  posting a second one.
+- The `## QA Results` comment (step 4) is separate from that response comment
+  and always required — post the results even when nothing failed, and mirror
+  them to the ticket when there is one. On a re-run, edit the existing results
+  comment instead of posting a second one.
 - Your job ends at either a merge (with its comment) or a hold (with its
   explanation).
