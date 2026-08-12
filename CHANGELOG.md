@@ -12,10 +12,122 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
-MINOR. A skill gains an input shape it did not have; nothing that worked before
-works differently.
+MAJOR. The review workflow loses a job, three inputs and three outputs. A
+consumer that passes any of the removed inputs goes red on its next run without
+editing anything, which is the test in [LIFECYCLE.md](LIFECYCLE.md).
+
+### Fixed
+
+- **`refine-initiative`'s frontmatter was not valid YAML.** Its `description`
+  contained an unquoted `plans: those belong…`, and a bare `: ` inside a plain
+  scalar makes the parser read a nested mapping where a string was meant — so
+  the whole block failed to load. Rewritten with an em-dash, matching how every
+  other skill in the plugin punctuates the same construction. The wording is
+  otherwise untouched.
+
+  Worth knowing because the symptom is silent: the skill was shipped in v3.1.0
+  and nothing in CI parses skill frontmatter, so a description that never loads
+  looks exactly like one that loads fine until a client tries to read it. All
+  seven skills now parse, and their descriptions round-trip complete.
+
+### Removed
+
+- **The `test-plan` agent, and the QA comment it posted on every PR.** The
+  review workflow now runs one agent — the Thermonuclear Review — instead of
+  two. Gone with it: the `## Test Plan` comment and its
+  `<!-- colormath-test-plan -->` / `<!-- testplan … -->` verdict markers, the
+  `enable-test-plan` / `test-plan-model` / `test-plan-effort` inputs, the
+  `qa_depth` / `requires_ui_qa` / `requires_api_qa` workflow outputs, and the
+  placeholder `api-qa` / `ui-qa` jobs that gated on them.
+
+  A QA plan is a set of claims about a *running* system — this page renders for
+  that role, this endpoint 403s for the other one. A GitHub workflow cannot
+  bring the app up, log in as three identities and watch what happens, so the
+  test-plan agent could only ever **write** the plan. That put the plan on the
+  one surface least able to act on it, and billed a second agent per PR to get
+  it there. The plan now lives on the ticket, where grooming already writes one
+  and where `ship` can execute it.
+
+  The `model` input keeps its name and default but now feeds only the reviewer;
+  with `test-plan-model` gone, setting `model:` alone once again configures
+  everything the workflow runs.
 
 ### Changed
+
+- **The review no longer runs on PRs with no code in them, and thinks less hard
+  by default.** Two cost changes, measured rather than guessed. Across 30
+  intendent reviews on v3.1.0 the reviewer averaged **$0.68** (median $0.63,
+  range $0.30–$1.82) over 21 turns; cost correlates with turn count at r=0.86
+  and with diff size at only r=0.75 — a 145-line PR burned 47 turns and $1.12
+  while a 1,711-line PR cost $0.97 in 19.
+
+  So: **`review-effort` drops from `medium` to `low`**, effort being the input
+  that most directly buys turns. The previous step, default-`high` → `medium` in
+  v3.0.0, took the reviewer from $1.00 to $0.68; this one is the same dial one
+  notch further. It is the first thing to turn back if a repo finds the reviewer
+  missing things, and `review-effort: medium` in the caller restores the old
+  behavior exactly.
+
+  And a **`triage` job** now decides whether the diff is worth reviewing at all.
+  It lists the PR's files over one REST call on a bare runner — no model — and
+  skips the review when **every** file matches the new `skip-paths` input
+  (default: `**/*.md`, `**/*.lock`, `**/package-lock.json`, `LICENSE`). The
+  all-or-nothing rule is the point: a PR touching code *and* docs is reviewed in
+  full, docs included, so the skip fires on a typo fix or a lockfile bump and
+  never on a real change that happens to carry a README. `skip-paths: ""`
+  reviews everything.
+
+  `review / review` therefore now shows as `SKIPPED` on those PRs, which is a
+  new state for anything reading that check. `ship` learned to tell it apart
+  from a review that errored before posting — the first is "there was nothing to
+  audit" and satisfies its merge gate, the second still holds the merge — and
+  cross-checks `review / triage`'s step summary so a misconfigured `skip-paths`
+  surfaces as a question rather than a silent merge.
+
+  A repo whose *product* is markdown wants a different default; override
+  `skip-paths` there.
+
+- **`ship` takes its QA plan from the ticket, and writes one when there isn't
+  one.** Step 4 was "wait for the test-plan agent, then execute what it posted."
+  It is now: resolve the ticket from the branch, PR title/body and commits; read
+  its `qa_plan` over MCP; execute that against the running stack.
+
+  What happens when the plan is missing or wrong is the substance of this
+  change. An **empty** `qa_plan` gets filled — ship drafts one from the diff and
+  writes it to the field, opening it with a line naming its provenance
+  (`_Authored by /colormath:ship while shipping PR #<n> — not groomed._`) so a
+  later reader never mistakes it for something that was reviewed. A **groomed**
+  `qa_plan` is never edited: where it has gone stale, the amendment goes on as a
+  ticket comment and the amended version is what runs. The field stays the
+  record of what was intended; comments are the record of what happened — the
+  same split `implement-ticket` already keeps. A PR with **no** ticket still
+  gets QA'd; that plan just lives in the PR, and ship does not invent a ticket
+  to hold it.
+
+  Results are posted twice: a `## QA Results` comment on the PR (renamed from
+  `## Test Plan · Results`), mirrored onto the ticket, because a plan whose
+  results only ever existed on a PR is one nobody can audit later.
+
+  Two knock-on corrections. The merge decision's third gate used to end "No
+  review workflow at all → no test plan → this gate fails"; QA no longer depends
+  on the review workflow, so a missing ticket is explicitly *not* an excuse for
+  skipping it. And the first gate now says plainly that a missing or errored
+  review fails it — a clean QA run does not substitute for a review that never
+  happened.
+
+  `allowed-tools` gains `mcp__abacus__get_ticket`, `update_ticket`,
+  `add_comment`, `list_boards` and `list_tickets`. With no abacus MCP server
+  configured the step still runs: ship drafts the plan in the PR and says no
+  ticket backed it.
+
+- **`ship`'s "one review per run" rule keeps its teeth, on a new argument.** The
+  rule was justified partly by the test-plan agent — a re-review spawned a fresh
+  plan and a fresh QA round. That agent is gone; the loop is not. Re-reviewing a
+  diff you have already responded to still yields findings that look substantive
+  enough to justify another round of fixes, QA and review, with no exit
+  condition. The plugin README also described step 5 as "re-triggering the
+  review with `@claude` once when fixes are substantive", which contradicted the
+  skill it documents; that is corrected.
 
 - **`bugfix` now takes a ticket key as well as a pasted report.**
   `/colormath:bugfix CM-00012` reads the ticket over MCP — description, type,
@@ -51,6 +163,33 @@ works differently.
 
   Downstream, this makes `/colormath:bugfix <key>` a command a tracker can print
   next to a bug and have somebody run as-is, which it could not before.
+
+### Upgrade notes
+
+Paste into Claude Code in each consumer repo:
+
+> Bump the colormath pins to `vX.Y.Z`: update the `uses:` refs in
+> `.github/workflows/gates.yml` and the review caller (`review.yml` or
+> `review.yaml`), set `COLORMATH_REF` in `Makefile.colormath` to match, and run
+> `make colormath-update REF=vX.Y.Z` to refresh the vendored files. Then open
+> the review caller and delete any `test-plan-model`, `test-plan-effort` or
+> `enable-test-plan` input under `with:` — those inputs no longer exist and
+> passing one fails the workflow at startup. If any job in this repo has
+> `needs:` on the review job and reads `qa_depth`, `requires_ui_qa` or
+> `requires_api_qa` from its outputs, delete that job — those outputs are gone.
+> The review also now defaults to `review-effort: low` and skips PRs whose files
+> all match `skip-paths`; if this repo's product is markdown, set `skip-paths`
+> to something narrower in the caller. Finally run `make preflight`.
+
+Most repos need only the pin bump: neither intendent nor talas passed any of the
+removed inputs, and the placeholder `api-qa` / `ui-qa` jobs lived inside
+colormath rather than in consumers. The `## Test Plan` comments already on open
+PRs are inert — nothing reads them any more; leave them or delete them.
+
+If you keyed anything of your own on the `## Test Plan` marker or the
+`<!-- colormath-test-plan -->` HTML comment, it will now find nothing. The
+equivalent is `## QA Results`, posted by `/colormath:ship` rather than by CI —
+so it lands when the branch is shipped, not when the PR opens.
 
 ## v3.1.0 — 2026-08-04
 

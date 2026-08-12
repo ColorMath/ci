@@ -140,8 +140,8 @@ minted. Local state is yours to change and yours to put back.
 
 Run the repo's full local gate mirror once (`make preflight`) so an avoidable
 failure does not cost a CI round trip. Then invoke `/colormath:ship`, which
-takes it the rest of the way: PR, gates, the review and its generated test plan
-executed against the running stack, fixes for what turns up, and either an
+takes it the rest of the way: PR, gates, the review, a second pass over this
+same QA plan against the running stack, fixes for what turns up, and either an
 auto-merge when the PR is genuinely clean or a hold with the reason.
 
 Give ship a title naming the change in the ticket's own terms, and a body that

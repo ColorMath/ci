@@ -1,19 +1,26 @@
 name: Review
 
-# Reusable AI review suite for pull requests (optional — adopt by adding a
-# caller workflow; skip it and nothing changes). Two independent agents run
-# in parallel with each other and with the gates:
+# Reusable AI review workflow for pull requests (optional — adopt by adding a
+# caller workflow; skip it and nothing changes). Two jobs, in parallel with the
+# gates:
 #
+#   triage     — decides on a bare runner whether the diff contains anything
+#                worth paying a reviewer for (see `skip-paths`). No model is
+#                invoked, so a skipped review costs Actions seconds.
 #   review     — the "Thermonuclear Review": a deliberately adversarial audit
 #                of the PR diff, posted as a tracking comment led by the
 #                marker line `## Thermonuclear Review` (downstream automation
-#                can key off that marker).
-#   test-plan  — a QA test-plan agent that classifies the diff (UI vs API
-#                surface), posts a `## Test Plan` comment with concrete QA
-#                checklists, and exposes a machine-readable verdict
-#                (qa_depth / requires_ui_qa / requires_api_qa) as workflow
-#                outputs. Placeholder api-qa / ui-qa jobs gate on the verdict;
-#                consumers can also gate their own jobs on the outputs.
+#                can key off that marker). Shows as SKIPPED when triage says
+#                there is no code here; `/colormath:ship` reads that as
+#                "nothing to audit", distinct from a review that errored.
+#
+# QA is deliberately NOT here. It used to run as a second `test-plan` agent
+# that posted a `## Test Plan` comment on every PR; that plan is now owned by
+# the ticket in Abacus and executed by `/colormath:ship` against a running
+# stack. A plan posted by CI could only ever be a static checklist — nothing
+# in a workflow can bring the app up, log in as three roles and watch the
+# behavior — so the plan lived where it could not be executed, and paid for a
+# second agent on every PR to put it there.
 #
 # Consumers call this with:
 #
@@ -47,70 +54,54 @@ on:
   workflow_call:
     inputs:
       model:
-        description: >-
-          Fallback model, used by whichever agent has no explicit model set.
-          Since test-plan-model now defaults to Haiku, setting this alone no
-          longer changes both agents — set test-plan-model too if you want one
-          model everywhere.
+        description: Fallback model, used when review-model is not set.
         type: string
         default: "claude-sonnet-4-6"
       review-model:
         description: >-
           Model for the review agent. Empty falls back to `model`. Kept on
-          Sonnet by default: adversarial review is the half of this workflow
-          where model tier actually buys findings.
+          Sonnet by default: adversarial review is where model tier actually
+          buys findings.
         type: string
         default: ""
-      test-plan-model:
-        description: >-
-          Model for the test-plan agent. This agent does read-only analysis and
-          emits a checklist, which Haiku handles at a third of Sonnet's price —
-          the larger of the two savings, and the reason it defaults down here
-          while the reviewer does not.
-        type: string
-        default: "claude-haiku-4-5"
       review-effort:
         description: >-
           Claude Code `--effort` for the review agent (low | medium | high |
-          max; xhigh needs Opus 4.7+). Empty passes no flag. Defaults to medium
-          rather than the model's own `high`, trading some depth for spend.
+          max; xhigh needs Opus 4.7+). Empty passes no flag. Defaults to `low`:
+          measured over 30 intendent reviews, cost tracks turn count (r=0.86)
+          more than diff size, and effort is the input that most directly buys
+          turns. Raise it on a repo where the reviewer is missing things.
         type: string
-        default: "medium"
-      test-plan-effort:
-        description: >-
-          Claude Code `--effort` for the test-plan agent. Empty by design:
-          effort is rejected by Haiku 4.5 and Sonnet 4.5, so setting this
-          alongside the default test-plan-model will fail the request. Set it
-          only when you have also moved test-plan-model to a 4.6+ model.
-        type: string
-        default: ""
+        default: "low"
       review-focus:
         description: Extra project-specific emphasis appended to the review prompt (e.g. sensitive surfaces to scrutinize)
         type: string
         default: ""
+      skip-paths:
+        description: >-
+          Newline-separated globs. The review is skipped only when EVERY file
+          in the PR matches one of them — a PR touching code *and* docs is
+          still reviewed in full, docs included. Set to an empty string to
+          review every PR.
+        type: string
+        default: |
+          **/*.md
+          **/*.lock
+          **/package-lock.json
+          LICENSE
       enable-review:
-        type: boolean
-        default: true
-      enable-test-plan:
         type: boolean
         default: true
     secrets:
       anthropic_api_key:
-        description: Anthropic API key used by both agents
+        description: Anthropic API key used by the review agent
         required: true
-    outputs:
-      qa_depth:
-        description: Test-plan verdict — low | medium | high
-        value: ${{ jobs.test-plan.outputs.qa_depth }}
-      requires_ui_qa:
-        description: Test-plan verdict — "true" when rendered-UI behavior may differ
-        value: ${{ jobs.test-plan.outputs.requires_ui_qa }}
-      requires_api_qa:
-        description: Test-plan verdict — "true" when request/response behavior changed
-        value: ${{ jobs.test-plan.outputs.requires_api_qa }}
 
 jobs:
-  review:
+  # Decides whether this diff is worth paying a reviewer for, before any model
+  # is invoked. Runs on a bare runner and calls one REST endpoint, so a skipped
+  # review costs Actions seconds instead of the ~$0.68 a review averages.
+  triage:
     # Run when a non-draft PR is opened/reopened/marked ready, OR when someone
     # mentions @claude in a comment on a PR (issue_comment fires on issues too,
     # so gate on `.issue.pull_request` to ensure the comment is on a PR).
@@ -119,6 +110,62 @@ jobs:
       ((github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '@claude')) ||
        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read      # list the PR's changed files
+    outputs:
+      reviewable: ${{ steps.decide.outputs.reviewable }}
+    steps:
+      - name: Is there anything here worth reviewing?
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # Both comment events carry the PR number as .issue.number; only
+          # pull_request carries .pull_request.number. Same fallback the
+          # concurrency groups use.
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          SKIP_PATHS: ${{ inputs.skip-paths }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' > files.txt
+          python3 - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import fnmatch, os
+
+          files = [l.strip() for l in open("files.txt") if l.strip()]
+          pats = [p.strip() for p in os.environ["SKIP_PATHS"].splitlines() if p.strip()]
+
+          def skippable(path):
+              for p in pats:
+                  # fnmatch's '*' already crosses '/', so a '**/' prefix is
+                  # redundant for nested paths but stops the pattern matching a
+                  # root-level file. Test the stripped form too so '**/*.md'
+                  # covers both 'docs/a.md' and 'README.md'.
+                  if fnmatch.fnmatch(path, p): return True
+                  if p.startswith("**/") and fnmatch.fnmatch(path, p[3:]): return True
+              return False
+
+          unreviewed = [f for f in files if skippable(f)]
+          reviewable = bool(files) and len(unreviewed) < len(files)
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write(f"## Review triage\n\n{len(files)} changed file(s); "
+                      f"{len(unreviewed)} matched `skip-paths`.\n\n")
+              s.write("Reviewing this PR.\n" if reviewable else
+                      "**Skipped** — every changed file matches `skip-paths`, "
+                      "so there is no code here to audit.\n")
+              if not files:
+                  s.write("\n(No files reported for this PR.)\n")
+              s.write("\n" + "\n".join(f"- `{f}`" + ("" if f in unreviewed else "  ← reviewable")
+                                       for f in files[:50]) + "\n")
+
+          print(f"reviewable={'true' if reviewable else 'false'}")
+          PY
+
+  review:
+    needs: [triage]
+    if: needs.triage.outputs.reviewable == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read          # review-only: does NOT push commits
@@ -202,171 +249,3 @@ jobs:
               findings. If you found nothing worth flagging, say so explicitly
               (e.g. "✅ No blocking issues; N nits below") rather than leaving
               it empty.
-
-  # Runs in PARALLEL with `review` (no `needs:`) and with the gates workflow.
-  # Generates a QA test plan for the PR and posts it as its own PR comment,
-  # then exposes a machine-readable verdict (QA depth + whether UI/API QA is
-  # needed) as job outputs so a downstream QA-executor job can consume them.
-  test-plan:
-    if: |
-      inputs.enable-test-plan &&
-      ((github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
-       (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '@claude')) ||
-       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')))
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read          # analysis-only: does NOT push commits
-      pull-requests: write     # post the test-plan comment
-      issues: write            # comment API for comment-triggered runs
-      id-token: write          # OIDC
-    concurrency:
-      group: claude-testplan-${{ github.event.pull_request.number || github.event.issue.number }}
-      cancel-in-progress: true
-    # Exposed as workflow_call outputs so a consumer QA-executor job can gate
-    # on them (e.g. `needs: [review]` + `if: needs.review.outputs.requires_ui_qa == 'true'`).
-    outputs:
-      qa_depth: ${{ steps.verdict.outputs.qa_depth }}
-      requires_ui_qa: ${{ steps.verdict.outputs.requires_ui_qa }}
-      requires_api_qa: ${{ steps.verdict.outputs.requires_api_qa }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0       # full history so it can diff against base
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.anthropic_api_key }}
-          # Same tag-mode wiring as `review` so the agent can always post its
-          # comment, even on an automation/comment trigger.
-          track_progress: true
-          claude_args: "--model ${{ inputs.test-plan-model || inputs.model }} --verbose${{ inputs.test-plan-effort && format(' --effort {0}', inputs.test-plan-effort) || '' }}"
-          prompt: |
-            You are the QA TEST-PLAN agent for this PR. You do read-only
-            analysis: study the PR's diff (and the surrounding code as context)
-            and produce a concrete plan for how a human or agent should QA this
-            change. You do NOT review code quality — that is a separate job.
-
-            First, classify every changed path using this app archetype's
-            FE/BE boundary:
-            - UI-affecting: `templates/**/*.html`, `static/js/**/*.js` (not
-              `*.test.js`), `static/css/src/**/*.css`, and any `routes/*.py`
-              change that adds/modifies a `TemplateResponse`/`HTMLResponse` or
-              the context it renders.
-            - API/backend: `models/`, `services/`, `handlers/`, migrations,
-              JSON-only routes, background jobs, infra, docs, tests.
-
-            Then decide the verdict:
-            - qa_depth — overall risk/effort to QA this PR:
-              * low    — tiny, low-risk, well-covered change (copy tweak,
-                         isolated helper, docs).
-              * medium — a feature or behavior change touching one area, with
-                         a few interacting paths.
-              * high   — broad/cross-cutting change, auth/permissions/billing,
-                         data migrations, or anything touching money, security,
-                         or destructive operations.
-            - requires_ui_qa — true if any UI-affecting path changed or rendered
-              HTML/JS/CSS behavior could differ; otherwise false. (The CI
-              gates do NOT exercise the rendered UI, so visual regressions are
-              uncaught — lean toward true when a template/JS/CSS file changed.)
-            - requires_api_qa — true if request/response behavior, routes,
-              services, models, migrations, or background jobs changed;
-              otherwise false.
-
-            Post your output as a PR *comment* (the tracking comment this action
-            maintains). Begin it with EXACTLY this marker line so humans and
-            automation can find it:
-
-                ## Test Plan
-
-            Immediately after the marker, on its own line, include this hidden
-            HTML comment with the machine-readable verdict — fill the three
-            values, keep the format byte-for-byte (a later workflow step greps
-            it to set job outputs):
-
-                <!-- colormath-test-plan -->
-                <!-- testplan qa_depth=<low|medium|high> requires_ui_qa=<true|false> requires_api_qa=<true|false> -->
-
-            Then write, in this order:
-            1. Change summary — what the PR does and the riskiest areas, in 2-4
-               bullets.
-            2. Verdict — restate qa_depth / requires_ui_qa / requires_api_qa in
-               plain English, and name the exact paths that drove each.
-            3. Full-UI QA checklist — concrete, clickable steps to exercise the
-               feature through the browser: which pages/routes to visit, what
-               auth/role and seed data are needed, the actions to take, and the
-               expected result for each (mark "N/A — no UI surface" if
-               requires_ui_qa is false).
-            4. API-only QA checklist — concrete steps to exercise it without the
-               UI: endpoints/methods/payloads to call, auth needed, DB/state to
-               verify, and expected status/response for each (mark "N/A" if
-               requires_api_qa is false).
-            5. Residual risk — what the existing CI gates already cover vs. what
-               they do not (call out explicitly that rendered-UI regressions are
-               not caught by CI).
-
-            Make every checklist item independently checkable (checkbox list),
-            specific to THIS diff — no generic boilerplate. Narrate which files
-            you read as you go so the run is easy to follow.
-      - name: Parse verdict into job outputs
-        id: verdict
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
-        run: |
-          # The agent embeds a hidden `<!-- testplan ... -->` marker in its
-          # comment. Pull the latest test-plan comment and parse it; fall back
-          # to the conservative worst case (high / true / true) if anything is
-          # missing, so a downstream QA job never under-tests by accident.
-          body=$(gh pr view "$PR" --json comments \
-            --jq '[.comments[] | select(.body | contains("<!-- colormath-test-plan -->"))] | last | .body' \
-            2>/dev/null || true)
-          marker=$(printf '%s' "$body" | grep -oE '<!-- testplan [^>]*-->' | tail -n1 || true)
-
-          depth=$(printf '%s' "$marker" | grep -oE 'qa_depth=(low|medium|high)' | cut -d= -f2 | tail -n1)
-          ui=$(printf '%s' "$marker" | grep -oE 'requires_ui_qa=(true|false)' | cut -d= -f2 | tail -n1)
-          api=$(printf '%s' "$marker" | grep -oE 'requires_api_qa=(true|false)' | cut -d= -f2 | tail -n1)
-
-          depth=${depth:-high}; ui=${ui:-true}; api=${api:-true}
-          {
-            echo "qa_depth=$depth"
-            echo "requires_ui_qa=$ui"
-            echo "requires_api_qa=$api"
-          } >> "$GITHUB_OUTPUT"
-
-          parsed="✅"; [ -n "$marker" ] || parsed="⚠️ marker not found — using conservative defaults"
-          {
-            echo "## Test Plan · verdict"
-            echo ""
-            echo "| field | value |"
-            echo "|---|---|"
-            echo "| qa_depth | \`$depth\` |"
-            echo "| requires_ui_qa | \`$ui\` |"
-            echo "| requires_api_qa | \`$api\` |"
-            echo ""
-            echo "$parsed"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # Conditional QA jobs, gated on the test-plan verdict. Each `needs:` the
-  # test-plan job so it can read its outputs, and only runs when that kind of
-  # QA was flagged. Placeholders for now — they just echo the QA depth and
-  # their own name; real QA steps will replace the echo later.
-  api-qa:
-    needs: [test-plan]
-    if: needs.test-plan.outputs.requires_api_qa == 'true'
-    runs-on: ubuntu-latest
-    permissions: {}          # placeholder echo — needs no token scopes
-    steps:
-      - name: API QA (placeholder)
-        run: |
-          echo "job=api-qa"
-          echo "qa_depth=${{ needs.test-plan.outputs.qa_depth }}"
-
-  ui-qa:
-    needs: [test-plan]
-    if: needs.test-plan.outputs.requires_ui_qa == 'true'
-    runs-on: ubuntu-latest
-    permissions: {}          # placeholder echo — needs no token scopes
-    steps:
-      - name: UI QA (placeholder)
-        run: |
-          echo "job=ui-qa"
-          echo "qa_depth=${{ needs.test-plan.outputs.qa_depth }}"

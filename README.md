@@ -183,35 +183,36 @@ and so on) — and **remove the required contexts left over from your
 pre-colormath workflow**. Old names never report under the suite, so each one
 pins every PR at "Expected — waiting for status" and blocks merging.
 
-## Optional: AI review + test plan
+## Optional: AI review
 
 [review.yml](.github/workflows/review.yml) is a second reusable workflow —
 entirely opt-in, adopted per project by adding a caller (skip the caller and
-nothing changes). It runs two Claude agents in parallel on every non-draft PR
+nothing changes). It runs one Claude agent on every non-draft PR
 (re-runnable by commenting `@claude`):
 
 - **review** — the "Thermonuclear Review": a deliberately adversarial audit of
   the diff across correctness, security, maintainability, and DevEx, posted as
   a tracking comment (marker line `## Thermonuclear Review`) with inline
   comments on the relevant lines.
-- **test-plan** — classifies the diff (UI vs API surface) and posts a
-  `## Test Plan` comment with concrete QA checklists, exposing a
-  machine-readable verdict (`qa_depth`, `requires_ui_qa`, `requires_api_qa`)
-  as workflow outputs for downstream QA jobs to gate on.
 
-### Installing the review suite
+**QA is not here.** A second `test-plan` agent used to post a `## Test Plan`
+comment on every PR; it has been removed. The QA plan belongs to the ticket in
+Abacus, where `/colormath:refine-ticket` writes it and `/colormath:ship`
+executes it against a running stack — the thing CI cannot do. See
+[Where QA lives](#where-qa-lives).
 
-Both agents run via `anthropics/claude-code-action`, which needs more than
+### Installing the review workflow
+
+The agent runs via `anthropics/claude-code-action`, which needs more than
 the caller file — do these once per repo, in order:
 
 1. **Install the [Claude GitHub App](https://github.com/apps/claude)** on the
    repo (or org). The action exchanges OIDC (`id-token: write`) for an app
    token and posts its comments as `claude[bot]` — without the app installed,
-   the agents cannot authenticate to GitHub and the jobs fail at startup.
+   the agent cannot authenticate to GitHub and the job fails at startup.
 2. **Add the API key secret**:
    `gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>`
-   (an Anthropic API key with access to the model you configure; both agents
-   share it).
+   (an Anthropic API key with access to the model you configure).
 3. **Add the caller workflow** below, pinned to an exact tag.
 4. Optionally set `review-focus` to point the reviewer at your project's
    sensitive surfaces — without it the review is generic.
@@ -241,38 +242,65 @@ jobs:
       review-focus: "Pay attention to <project-specific hot spots>."
 ```
 
-Inputs: `review-focus` (extra project-specific emphasis for the reviewer),
-`enable-review` / `enable-test-plan` toggles, and per-agent model and effort
-controls. Requires an `ANTHROPIC_API_KEY` repo secret.
+Inputs: `review-focus` (extra project-specific emphasis for the reviewer), an
+`enable-review` toggle, `skip-paths`, and model/effort controls. Requires an
+`ANTHROPIC_API_KEY` repo secret.
 
 | Input | Default | Purpose |
 |---|---|---|
-| `model` | `"claude-sonnet-4-6"` | Fallback for whichever agent has no explicit model |
+| `model` | `"claude-sonnet-4-6"` | Fallback when `review-model` is unset |
 | `review-model` | `""` → `model` | Model for the review agent |
-| `test-plan-model` | `"claude-haiku-4-5"` | Model for the test-plan agent |
-| `review-effort` | `"medium"` | `--effort` for the review agent |
-| `test-plan-effort` | `""` (no flag) | `--effort` for the test-plan agent |
+| `review-effort` | `"low"` | `--effort` for the review agent |
+| `skip-paths` | `**/*.md`, `**/*.lock`, `**/package-lock.json`, `LICENSE` | PRs whose files *all* match are not reviewed |
 
-The two agents are priced very differently in practice — on a representative
-PR the reviewer cost $1.00 over 18 turns and the test-plan agent $0.53 over
-14. So the defaults put the test-plan agent on Haiku (read-only analysis
-producing a checklist — well inside its range, at a third of Sonnet's price)
-and drop the reviewer to `medium` effort, while leaving the reviewer itself on
-Sonnet, where adversarial depth actually buys findings.
+The reviewer stays on Sonnet, where adversarial depth actually buys findings,
+but at `low` effort. Measured over 30 intendent reviews, cost tracks turn count
+(r=0.86) more closely than diff size (r=0.75), and effort is the input that most
+directly buys turns — so it is the first dial to turn and the first to turn back
+if the reviewer starts missing things. **`effort` is rejected by Haiku 4.5 and
+Sonnet 4.5**, so if you move `review-model` down, clear `review-effort` in the
+same edit or the request fails.
 
-Two sharp edges. **`effort` is rejected by Haiku 4.5 and Sonnet 4.5**, so
-setting `test-plan-effort` while `test-plan-model` is on its Haiku default
-will fail the request — move that model to a 4.6+ model first. And because
-`test-plan-model` has a non-empty default, setting `model:` alone no longer
-reaches both agents; set `test-plan-model:` too if you want one model
-everywhere.
+`skip-paths` is deliberately conservative, and the rule is **all or nothing**: a
+PR is skipped only when *every* changed file matches. A PR touching code and
+docs is reviewed in full, docs included — so the skip fires on a typo fix or a
+lockfile bump, never on a change that happens to include a README. A `triage`
+job makes that call on a bare runner before any model is invoked, so a skipped
+review costs Actions seconds rather than the ~$0.68 a review averages, and its
+step summary lists exactly which files it judged. Set `skip-paths: ""` to review
+everything; extend it if your repo generates other unreviewable files.
+
+If your repo's *product* is markdown — a docs site, a prompt library — the
+`**/*.md` default is wrong for you. Override it.
 
 The `issue_comment` / `pull_request_review_comment` triggers are what enable
 `@claude` re-runs, but they come with noise: GitHub can't filter comment
 events by body at the trigger level, so **every** PR comment — including the
-review's own two bot comments — creates a run that immediately skips. If you
+review's own bot comment — creates a run that immediately skips. If you
 prefer a quiet Actions tab, keep only the `pull_request` trigger and re-run
 reviews from the Actions UI (or flip the PR draft → ready).
+
+### Where QA lives
+
+Not in CI. A QA plan is a set of claims about a *running* system — this page
+renders for that role, this endpoint 403s for the other one — and a workflow
+cannot bring the app up, log in as three identities and watch what happens. The
+`test-plan` agent that used to run here could therefore only write the plan,
+never execute it, which put the plan on the one surface least able to act on it
+and billed a second agent per PR to get it there.
+
+So QA belongs to the **ticket**:
+
+| Stage | Skill | What it does |
+|---|---|---|
+| Grooming | `/colormath:refine-ticket` | Writes the ticket's `qa_plan` field alongside its implementation plan |
+| Building | `/colormath:implement-ticket` | Executes that plan against a running stack as it builds |
+| Shipping | `/colormath:ship` | Re-executes it on the PR; **writes one if the ticket has none** |
+
+`ship` fills an empty `qa_plan` and marks it as ship-authored, but never edits a
+groomed one — amendments go on as ticket comments, so the field stays the record
+of what was intended and the comments record what actually happened. A PR with
+no ticket still gets QA'd; the plan just lives in the PR.
 
 ## Optional: Claude Code plugin
 
@@ -280,8 +308,9 @@ This repo is also a [Claude Code plugin marketplace](https://code.claude.com/doc
 The `colormath` plugin ships skills for working in consumer repos:
 **`/colormath:ship`** takes the current branch through the whole PR pipeline
 (open the PR, watch the gates, wait for the Thermonuclear Review, execute the
-generated **test plan** against the running stack and post its results, fix
-every finding it can — blockers included) and ends at a gated final review that
+ticket's **QA plan** against the running stack — writing one when the ticket has
+none — and post its results, fix every finding it can — blockers included) and
+ends at a gated final review that
 **auto-merges** when the PR is genuinely clean or holds and explains why;
 **`/colormath:qa`** QAs a focus area against the running stack and hands the
 fixes to `ship`; **`/colormath:bugfix`** turns a *specific* bug report into a
@@ -434,7 +463,7 @@ While on `0.x`, breaking changes may land in any release.
 
 ```
 .github/workflows/gates.yml    # the reusable gate suite (workflow_call)
-.github/workflows/review.yml   # optional reusable AI review + test-plan suite
+.github/workflows/review.yml   # optional reusable AI review workflow
 .github/workflows/ci.yml       # self-test: runs the suite against example/
 .github/actions/               # setup-python-poetry, setup-node, gate-summary
 .claude-plugin/                # plugin marketplace manifest
