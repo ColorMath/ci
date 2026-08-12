@@ -16,6 +16,20 @@ MAJOR. The review workflow loses a job, three inputs and three outputs. A
 consumer that passes any of the removed inputs goes red on its next run without
 editing anything, which is the test in [LIFECYCLE.md](LIFECYCLE.md).
 
+### Fixed
+
+- **`refine-initiative`'s frontmatter was not valid YAML.** Its `description`
+  contained an unquoted `plans: those belong…`, and a bare `: ` inside a plain
+  scalar makes the parser read a nested mapping where a string was meant — so
+  the whole block failed to load. Rewritten with an em-dash, matching how every
+  other skill in the plugin punctuates the same construction. The wording is
+  otherwise untouched.
+
+  Worth knowing because the symptom is silent: the skill was shipped in v3.1.0
+  and nothing in CI parses skill frontmatter, so a description that never loads
+  looks exactly like one that loads fine until a client tries to read it. All
+  seven skills now parse, and their descriptions round-trip complete.
+
 ### Removed
 
 - **The `test-plan` agent, and the QA comment it posted on every PR.** The
