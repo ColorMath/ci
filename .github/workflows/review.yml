@@ -1,13 +1,18 @@
 name: Review
 
 # Reusable AI review workflow for pull requests (optional — adopt by adding a
-# caller workflow; skip it and nothing changes). One agent runs, in parallel
-# with the gates:
+# caller workflow; skip it and nothing changes). Two jobs, in parallel with the
+# gates:
 #
+#   triage     — decides on a bare runner whether the diff contains anything
+#                worth paying a reviewer for (see `skip-paths`). No model is
+#                invoked, so a skipped review costs Actions seconds.
 #   review     — the "Thermonuclear Review": a deliberately adversarial audit
 #                of the PR diff, posted as a tracking comment led by the
 #                marker line `## Thermonuclear Review` (downstream automation
-#                can key off that marker).
+#                can key off that marker). Shows as SKIPPED when triage says
+#                there is no code here; `/colormath:ship` reads that as
+#                "nothing to audit", distinct from a review that errored.
 #
 # QA is deliberately NOT here. It used to run as a second `test-plan` agent
 # that posted a `## Test Plan` comment on every PR; that plan is now owned by
@@ -62,14 +67,28 @@ on:
       review-effort:
         description: >-
           Claude Code `--effort` for the review agent (low | medium | high |
-          max; xhigh needs Opus 4.7+). Empty passes no flag. Defaults to medium
-          rather than the model's own `high`, trading some depth for spend.
+          max; xhigh needs Opus 4.7+). Empty passes no flag. Defaults to `low`:
+          measured over 30 intendent reviews, cost tracks turn count (r=0.86)
+          more than diff size, and effort is the input that most directly buys
+          turns. Raise it on a repo where the reviewer is missing things.
         type: string
-        default: "medium"
+        default: "low"
       review-focus:
         description: Extra project-specific emphasis appended to the review prompt (e.g. sensitive surfaces to scrutinize)
         type: string
         default: ""
+      skip-paths:
+        description: >-
+          Newline-separated globs. The review is skipped only when EVERY file
+          in the PR matches one of them — a PR touching code *and* docs is
+          still reviewed in full, docs included. Set to an empty string to
+          review every PR.
+        type: string
+        default: |
+          **/*.md
+          **/*.lock
+          **/package-lock.json
+          LICENSE
       enable-review:
         type: boolean
         default: true
@@ -79,7 +98,10 @@ on:
         required: true
 
 jobs:
-  review:
+  # Decides whether this diff is worth paying a reviewer for, before any model
+  # is invoked. Runs on a bare runner and calls one REST endpoint, so a skipped
+  # review costs Actions seconds instead of the ~$0.68 a review averages.
+  triage:
     # Run when a non-draft PR is opened/reopened/marked ready, OR when someone
     # mentions @claude in a comment on a PR (issue_comment fires on issues too,
     # so gate on `.issue.pull_request` to ensure the comment is on a PR).
@@ -88,6 +110,62 @@ jobs:
       ((github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '@claude')) ||
        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read      # list the PR's changed files
+    outputs:
+      reviewable: ${{ steps.decide.outputs.reviewable }}
+    steps:
+      - name: Is there anything here worth reviewing?
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # Both comment events carry the PR number as .issue.number; only
+          # pull_request carries .pull_request.number. Same fallback the
+          # concurrency groups use.
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          SKIP_PATHS: ${{ inputs.skip-paths }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' > files.txt
+          python3 - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import fnmatch, os
+
+          files = [l.strip() for l in open("files.txt") if l.strip()]
+          pats = [p.strip() for p in os.environ["SKIP_PATHS"].splitlines() if p.strip()]
+
+          def skippable(path):
+              for p in pats:
+                  # fnmatch's '*' already crosses '/', so a '**/' prefix is
+                  # redundant for nested paths but stops the pattern matching a
+                  # root-level file. Test the stripped form too so '**/*.md'
+                  # covers both 'docs/a.md' and 'README.md'.
+                  if fnmatch.fnmatch(path, p): return True
+                  if p.startswith("**/") and fnmatch.fnmatch(path, p[3:]): return True
+              return False
+
+          unreviewed = [f for f in files if skippable(f)]
+          reviewable = bool(files) and len(unreviewed) < len(files)
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write(f"## Review triage\n\n{len(files)} changed file(s); "
+                      f"{len(unreviewed)} matched `skip-paths`.\n\n")
+              s.write("Reviewing this PR.\n" if reviewable else
+                      "**Skipped** — every changed file matches `skip-paths`, "
+                      "so there is no code here to audit.\n")
+              if not files:
+                  s.write("\n(No files reported for this PR.)\n")
+              s.write("\n" + "\n".join(f"- `{f}`" + ("" if f in unreviewed else "  ← reviewable")
+                                       for f in files[:50]) + "\n")
+
+          print(f"reviewable={'true' if reviewable else 'false'}")
+          PY
+
+  review:
+    needs: [triage]
+    if: needs.triage.outputs.reviewable == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read          # review-only: does NOT push commits

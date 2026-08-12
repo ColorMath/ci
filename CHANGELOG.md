@@ -54,6 +54,39 @@ editing anything, which is the test in [LIFECYCLE.md](LIFECYCLE.md).
 
 ### Changed
 
+- **The review no longer runs on PRs with no code in them, and thinks less hard
+  by default.** Two cost changes, measured rather than guessed. Across 30
+  intendent reviews on v3.1.0 the reviewer averaged **$0.68** (median $0.63,
+  range $0.30–$1.82) over 21 turns; cost correlates with turn count at r=0.86
+  and with diff size at only r=0.75 — a 145-line PR burned 47 turns and $1.12
+  while a 1,711-line PR cost $0.97 in 19.
+
+  So: **`review-effort` drops from `medium` to `low`**, effort being the input
+  that most directly buys turns. The previous step, default-`high` → `medium` in
+  v3.0.0, took the reviewer from $1.00 to $0.68; this one is the same dial one
+  notch further. It is the first thing to turn back if a repo finds the reviewer
+  missing things, and `review-effort: medium` in the caller restores the old
+  behavior exactly.
+
+  And a **`triage` job** now decides whether the diff is worth reviewing at all.
+  It lists the PR's files over one REST call on a bare runner — no model — and
+  skips the review when **every** file matches the new `skip-paths` input
+  (default: `**/*.md`, `**/*.lock`, `**/package-lock.json`, `LICENSE`). The
+  all-or-nothing rule is the point: a PR touching code *and* docs is reviewed in
+  full, docs included, so the skip fires on a typo fix or a lockfile bump and
+  never on a real change that happens to carry a README. `skip-paths: ""`
+  reviews everything.
+
+  `review / review` therefore now shows as `SKIPPED` on those PRs, which is a
+  new state for anything reading that check. `ship` learned to tell it apart
+  from a review that errored before posting — the first is "there was nothing to
+  audit" and satisfies its merge gate, the second still holds the merge — and
+  cross-checks `review / triage`'s step summary so a misconfigured `skip-paths`
+  surfaces as a question rather than a silent merge.
+
+  A repo whose *product* is markdown wants a different default; override
+  `skip-paths` there.
+
 - **`ship` takes its QA plan from the ticket, and writes one when there isn't
   one.** Step 4 was "wait for the test-plan agent, then execute what it posted."
   It is now: resolve the ticket from the branch, PR title/body and commits; read
@@ -144,7 +177,9 @@ Paste into Claude Code in each consumer repo:
 > passing one fails the workflow at startup. If any job in this repo has
 > `needs:` on the review job and reads `qa_depth`, `requires_ui_qa` or
 > `requires_api_qa` from its outputs, delete that job — those outputs are gone.
-> Finally run `make preflight`.
+> The review also now defaults to `review-effort: low` and skips PRs whose files
+> all match `skip-paths`; if this repo's product is markdown, set `skip-paths`
+> to something narrower in the caller. Finally run `make preflight`.
 
 Most repos need only the pin bump: neither intendent nor talas passed any of the
 removed inputs, and the placeholder `api-qa` / `ui-qa` jobs lived inside

@@ -25,9 +25,12 @@ recommendation:
    for the `review / review` check and reads the `## Thermonuclear Review`
    comment (plus any formal/human reviews and inline comments — full bodies,
    never truncated). Skips this wait, and says so, in repos without the
-   review workflow. Knows the review's failure modes (e.g. the
-   workflow-validation guard when a PR edits the review caller itself) and
-   reports them instead of treating silence as a clean review.
+   review workflow. Distinguishes the three conclusions that look alike from a
+   distance: a clean review, a `SKIPPED` one (the workflow's `triage` job found
+   only docs/lockfiles to look at — legitimate, and it checks the file list),
+   and one that errored before posting (e.g. the workflow-validation guard when
+   a PR edits the review caller itself) — reporting the last instead of
+   treating silence as a clean review.
 4. **QA against the ticket's plan** — resolves the ticket from the branch, PR
    and commits, then reads its `qa_plan` from Abacus and runs it against the
    **running** stack, reusing the `qa` skill's recon + verify discipline and

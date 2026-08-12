@@ -243,20 +243,35 @@ jobs:
 ```
 
 Inputs: `review-focus` (extra project-specific emphasis for the reviewer), an
-`enable-review` toggle, and model/effort controls. Requires an
+`enable-review` toggle, `skip-paths`, and model/effort controls. Requires an
 `ANTHROPIC_API_KEY` repo secret.
 
 | Input | Default | Purpose |
 |---|---|---|
 | `model` | `"claude-sonnet-4-6"` | Fallback when `review-model` is unset |
 | `review-model` | `""` → `model` | Model for the review agent |
-| `review-effort` | `"medium"` | `--effort` for the review agent |
+| `review-effort` | `"low"` | `--effort` for the review agent |
+| `skip-paths` | `**/*.md`, `**/*.lock`, `**/package-lock.json`, `LICENSE` | PRs whose files *all* match are not reviewed |
 
 The reviewer stays on Sonnet, where adversarial depth actually buys findings,
-but at `medium` effort rather than the model's own `high` — trading some depth
-for spend. **`effort` is rejected by Haiku 4.5 and Sonnet 4.5**, so if you move
-`review-model` down, clear `review-effort` in the same edit or the request
-fails.
+but at `low` effort. Measured over 30 intendent reviews, cost tracks turn count
+(r=0.86) more closely than diff size (r=0.75), and effort is the input that most
+directly buys turns — so it is the first dial to turn and the first to turn back
+if the reviewer starts missing things. **`effort` is rejected by Haiku 4.5 and
+Sonnet 4.5**, so if you move `review-model` down, clear `review-effort` in the
+same edit or the request fails.
+
+`skip-paths` is deliberately conservative, and the rule is **all or nothing**: a
+PR is skipped only when *every* changed file matches. A PR touching code and
+docs is reviewed in full, docs included — so the skip fires on a typo fix or a
+lockfile bump, never on a change that happens to include a README. A `triage`
+job makes that call on a bare runner before any model is invoked, so a skipped
+review costs Actions seconds rather than the ~$0.68 a review averages, and its
+step summary lists exactly which files it judged. Set `skip-paths: ""` to review
+everything; extend it if your repo generates other unreviewable files.
+
+If your repo's *product* is markdown — a docs site, a prompt library — the
+`**/*.md` default is wrong for you. Override it.
 
 The `issue_comment` / `pull_request_review_comment` triggers are what enable
 `@claude` re-runs, but they come with noise: GitHub can't filter comment

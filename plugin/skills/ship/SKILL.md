@@ -78,16 +78,25 @@ until \
   sleep 30
 done
 ```
-- **Check the review actually ran.** If the `review / review` check concluded
-  `FAILURE`
-  (`gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name=="review / review") | .conclusion'`)
-  and **no** `## Thermonuclear Review` comment exists, the review job *errored
-  before posting* — do not treat the absence of findings as a clean review.
-  The most common cause: a PR that edits the review caller workflow itself
-  trips the GitHub-App workflow-validation guard ("workflow file must … have
-  identical content to the version on the default branch"), so the review can
-  only run once the change is on the default branch. Report this to me instead
-  of recommending merge on a silent review.
+- **Check the review actually ran**, reading its conclusion with
+  `gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name=="review / review") | .conclusion'`.
+  Three outcomes, and they are **not** interchangeable:
+  - `SUCCESS` — read the findings below.
+  - `SKIPPED` — the workflow's `triage` job decided every changed file matches
+    its `skip-paths` (docs, lockfiles), so there was no code to audit. This is a
+    deliberate decision, not a failure: there are no findings because there was
+    nothing reviewable, and step 7's first gate is satisfied. Check
+    `review / triage`'s step summary to see the file list it judged, and say in
+    your report that the review was skipped and why. If that summary lists files
+    you consider real code, treat it as a misconfigured `skip-paths` and tell me
+    rather than merging on a review that never looked.
+  - `FAILURE` with **no** `## Thermonuclear Review` comment — the review job
+    *errored before posting*. Do not treat the absence of findings as a clean
+    review. The most common cause: a PR that edits the review caller workflow
+    itself trips the GitHub-App workflow-validation guard ("workflow file must …
+    have identical content to the version on the default branch"), so the review
+    can only run once the change is on the default branch. Report this to me
+    instead of recommending merge on a silent review.
 - Then read everything from **both** sources: `gh pr view <number> --json
   reviews,comments` (the thermonuclear findings are in `comments` under the
   `## Thermonuclear Review` marker; adversarial/human findings are in
@@ -262,10 +271,14 @@ Evaluate three gates against the **current** state of the branch:
 
 1. **A review ran, and had no Blockers.** Judged from the thermonuclear review
    as posted. No review workflow configured, or a review that errored before
-   posting, fails this gate — a clean QA run does not substitute for it. If the
-   review raised even one **Blocker**, hold for a human — *even if you
-   fixed it*. You still fix it in step 5; a Blocker simply means a person signs
-   off on the merge rather than this skill. Suggestions and nits never block.
+   posting, fails this gate — a clean QA run does not substitute for it. A
+   review the workflow deliberately **skipped** (step 3's `SKIPPED` case — every
+   file matched `skip-paths`) *satisfies* this gate: there is no code to audit,
+   so there is nothing for a Blocker to be in. Say so explicitly when you use
+   it. If the review raised even one **Blocker**, hold for a human — *even if
+   you fixed it*. You still fix it in step 5; a Blocker simply means a person
+   signs off on the merge rather than this skill. Suggestions and nits never
+   block.
 2. **Every review finding is resolved or consciously dismissed.** Each one is
    either fixed, or dismissed with a written reason in the **Addressed / Not
    changed** comment. Nothing silently skipped, nothing left needing a design
