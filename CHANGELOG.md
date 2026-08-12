@@ -12,6 +12,8 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+## v4.0.0 — 2026-08-12
+
 MAJOR. The review workflow loses a job, three inputs and three outputs. A
 consumer that passes any of the removed inputs goes red on its next run without
 editing anything, which is the test in [LIFECYCLE.md](LIFECYCLE.md).

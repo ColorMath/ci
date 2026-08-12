@@ -77,7 +77,7 @@ on:
       colormath-ref:
         description: colormath ref to fetch gate scripts from (stamped per release; do not set as a consumer)
         type: string
-        default: "v3.1.0"
+        default: "v4.0.0"
       ruff-spec:
         description: pip requirement spec for ruff (match your pyproject dev pin)
         type: string
