@@ -12,6 +12,17 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+### Fixed
+
+- **The review job failed at startup on every Dependabot PR.**
+  `anthropics/claude-code-action` refuses runs started by a bot unless the bot
+  is on its `allowed_bots` list, so each Dependabot PR showed a red
+  `review / review` check and no review. The action step now passes
+  `allowed_bots: dependabot`. Consumers must also add `ANTHROPIC_API_KEY` as a
+  Dependabot secret (`gh secret set ANTHROPIC_API_KEY --app dependabot`),
+  because Dependabot-started runs read Dependabot secrets, not Actions
+  secrets. Setup steps in the README updated.
+
 ## v4.0.0 — 2026-08-12
 
 MAJOR. The review workflow loses a job, three inputs and three outputs. A

@@ -213,6 +213,10 @@ the caller file — do these once per repo, in order:
 2. **Add the API key secret**:
    `gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>`
    (an Anthropic API key with access to the model you configure).
+   If Dependabot opens PRs in the repo, add it as a **Dependabot** secret
+   too: `gh secret set ANTHROPIC_API_KEY --app dependabot --repo <owner>/<repo>`.
+   Runs that Dependabot starts read Dependabot secrets, not Actions secrets,
+   so without this the review of a Dependabot PR starts with an empty key.
 3. **Add the caller workflow** below, pinned to an exact tag.
 4. Optionally set `review-focus` to point the reviewer at your project's
    sensitive surfaces — without it the review is generic.

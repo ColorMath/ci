@@ -185,6 +185,13 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.anthropic_api_key }}
+          # The action refuses runs started by a bot unless the bot is listed
+          # here, so without this every Dependabot PR fails the review job at
+          # startup instead of getting a review. Dependabot-started runs read
+          # secrets from the repo's *Dependabot* secrets, not its Actions
+          # secrets, so the consumer must also set ANTHROPIC_API_KEY there
+          # (`gh secret set ANTHROPIC_API_KEY --app dependabot`); see README.
+          allowed_bots: dependabot
           # track_progress forces "tag mode": the action creates a tracking
           # comment on the PR and wires up the inline-comment + comment-update
           # tools, so Claude can ALWAYS post its summary (and inline findings)
