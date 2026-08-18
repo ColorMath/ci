@@ -139,7 +139,8 @@ that failure mode looks exactly like success from the test suite. Re-running
 the thing that broke is the only check that actually closes the loop.
 
 Add regression tests at the layer the bug lived at, and run the repo's full
-suite plus `make preflight` (per `AGENTS.md`, once, before opening a PR).
+suite plus `make preflight` (per the repository's instruction files, once,
+before opening a PR).
 Distinguish any failure you introduced from the pre-existing ones you
 catalogued in step 4.
 

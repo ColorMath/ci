@@ -74,7 +74,7 @@ These are the unknowns that most often send a fix down the wrong path:
 surfaces turns open-ended interrogation ("which surface?") into a concrete
 multiple choice ("public signup form, invite acceptance, or admin-created
 user?"). Concrete options are dramatically cheaper for the reporter to answer
-and they surface the possibilities they hadn't considered. This is what
+and they surface the possibilities they hadn't considered.
 Use the host's structured question mechanism when available. Otherwise, ask
 numbered questions in chat with concrete options.
 

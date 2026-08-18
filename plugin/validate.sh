@@ -42,7 +42,7 @@ done
 
 # Canonical skills must stay portable. Host-specific installation and invocation
 # examples belong in clearly labeled documentation sections outside skills/.
-forbidden='\$ARGUMENTS|/colormath:|AskUserQuestion|multiSelect|mcp__[[:alnum:]_]+|claude-sonnet|CLAUDE\.md|`(Bash|Read|Edit|Write|Grep|Glob|Skill)`|^(allowed-tools|argument-hint|model):'
+forbidden='\$ARGUMENTS|/colormath:|AskUserQuestion|multiSelect|mcp__[[:alnum:]_]+|claude-sonnet|CLAUDE\.md|AGENTS\.md|`(Bash|Read|Edit|Write|Grep|Glob|Skill)`|^(allowed-tools|argument-hint|model):'
 if hits=$(grep -nEH "$forbidden" "${skill_files[@]}" 2>/dev/null); then
 	echo "$hits" >&2
 	fail "host-specific constructs found in canonical skills"
