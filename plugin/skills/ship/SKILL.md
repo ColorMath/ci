@@ -2,7 +2,7 @@
 name: ship
 description: Open a PR, wait for the gates and the review, then QA the change against a running stack from the ticket's QA plan in Abacus (writing one if the ticket has none), fix every finding — blockers included — then decide once, auto-merging when clean or holding for a human. Never re-triggers the review.
 argument-hint: [optional PR title]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__abacus__get_board mcp__abacus__link_pull_request
 model: claude-sonnet-4-6
 ---
 
@@ -22,12 +22,42 @@ Broad `Bash` is in `allowed-tools` on purpose: step 4 drives the local stack
 (`make up`, DB queries, `curl`, throwaway driver scripts) to actually run the
 QA plan, which no narrow `gh`/`git` allowlist can cover.
 
-## 1. Open the PR
+## 1. Open the PR, and record it on the ticket
 - Push the branch if needed (`git push -u origin HEAD`).
 - Create the PR with `gh pr create`. Use "$ARGUMENTS" as the title if provided,
   otherwise derive one from the branch's commits. Write a body that summarizes
   the diff and calls out anything a reviewer should look at.
 - Capture the PR number for the steps below.
+
+**Then link the PR to its ticket, before doing anything else with it.** You know
+which ticket this branch came from and which PR you just opened, and that
+connection is otherwise written down nowhere — it lived in the prose of a commit
+message, if at all. Four calls:
+
+1. **Identify the ticket** by the rule in step 4's *Find the ticket* — the same
+   rule, not a second one. If you cannot say which ticket this PR implements,
+   there is nothing to link and nothing below applies: say so and carry on.
+2. `mcp__abacus__get_ticket` on it, for its `board_id`.
+3. `mcp__abacus__get_board` on that board, and match its `repositories` on
+   `full_name` against the repository you actually pushed to (`gh repo view
+   --json nameWithOwner`).
+4. `mcp__abacus__link_pull_request` with the ticket id, that repository id, and
+   the PR number.
+
+Three things that decide what to do when it does not go cleanly:
+
+- **A duplicate is success.** Linking the same PR twice is refused, and on a
+  re-run of this skill that refusal means the link is already there. Read it as
+  done, not as an error.
+- **A repository that is not connected to the board is a hold, not a guess.**
+  Do not link to whichever repository the board happens to have, and do not link
+  to the only one when there are several — a wrong link is worse than none.
+  Record it and carry it to step 7.
+- **Any other failure is reported and carried forward, never swallowed.** Do not
+  abandon a green PR because a link failed; do not quietly continue either. Step
+  7 weighs it.
+
+Nothing here unlinks. `unlink_pull_request` stays a person's tool.
 
 ## 2. Poll the gates until green
 - Run `gh pr checks <number> --watch --fail-fast --interval 30`.
@@ -267,7 +297,7 @@ The go/no-go, and the one place this skill merges. Reach it directly from step
 single thermonuclear review, your responses to it, your QA results, and the
 gates on the current commit.
 
-Evaluate three gates against the **current** state of the branch:
+Evaluate four gates against the **current** state of the branch:
 
 1. **A review ran, and had no Blockers.** Judged from the thermonuclear review
    as posted. No review workflow configured, or a review that errored before
@@ -302,9 +332,25 @@ Evaluate three gates against the **current** state of the branch:
    gate; only a change with no runtime surface at all does, and you say so
    explicitly.
 
-**All three true → auto-merge.** Post a PR comment saying you are merging and
+4. **The ticket carries a link to this PR.** Read `pull_requests` from
+   `mcp__abacus__get_ticket` and look for **this PR's number** — not merely any
+   link. A ticket already naming three other PRs does not satisfy this.
+
+   This is what makes step 1's instruction mean something. An instruction on its
+   own is the thing that gets skipped when the run is long and the gates are
+   red; a completion criterion is not. So a PR whose ticket does not name it is
+   not ready, whatever else is green.
+
+   The gate is **not applicable** when there was no ticket to link — step 1 says
+   so explicitly, and a branch with no ticket must not become a spurious hold.
+   Where the link failed for a reason step 1 recorded, hold and name that reason:
+   a repository not connected to the board is fixed by connecting it, and saying
+   so is more use than reporting a missing link.
+
+**All four true → auto-merge.** Post a PR comment saying you are merging and
 why, naming the evidence: gates green, N findings addressed (0 Blockers), QA
-run with N items `✅` and each `⚠️` and its reason listed. Then merge with
+run with N items `✅` and each `⚠️` and its reason listed, and the ticket linked
+to this PR (or no ticket, said plainly). Then merge with
 `gh pr merge <number>` using the repo's established convention — inspect recent
 merges (`gh pr list --state merged`, or `git log`) and pass the matching flag
 (`--squash` / `--merge` / `--rebase`); default to `--squash` if it's unclear.
@@ -312,8 +358,9 @@ Report the merge to me.
 
 **Any false → hold and ask for a human.** Do **not** merge. Post a PR comment
 that states plainly what held it off — each Blocker the review raised, each
-finding deferred, and any QA item that failed or couldn't be performed (say
-which and why) — plus what you'd do next and what you want the human to look at.
+finding deferred, any QA item that failed or couldn't be performed (say which
+and why), and a missing link with the reason it is missing — plus what you'd do
+next and what you want the human to look at.
 Then STOP and report the same to me: "Held off auto-merge — here's why: …".
 When in doubt, hold: a wrong hold costs a human one click; a wrong merge is on
 the default branch.
@@ -333,6 +380,10 @@ the default branch.
   not terminate.
 - **QA always runs.** A ticket without a `qa_plan`, or a PR without a ticket, is
   a plan for you to write (step 4) — never a reason to skip QA.
+- **An agent always links its PR.** Step 1 records it on the ticket and step 7
+  refuses to merge without it. Both halves are needed: the instruction is what
+  makes it happen, the gate is what makes "always" true. A branch with no ticket
+  is the one case where there is nothing to link, and it is not a hold.
 - **Never edit a ticket's `qa_plan` that already has content.** Filling an empty
   one is writing down what was missing; changing a groomed one erases the
   difference between what was intended and what was done. Amendments go on as
