@@ -17,6 +17,23 @@ nothing a consumer runs can turn red without them editing anything.
 
 ### Added
 
+- **One canonical Agent Skills tree now ships for Claude Code, Codex, and other
+  compatible hosts.** `plugin/skills/` remains the only workflow source. A new
+  `.codex-plugin/plugin.json` points at that tree alongside Claude's existing
+  manifest, and all seven skills now use standard `name`, `description`, and
+  `compatibility` frontmatter instead of model pins, host tool allowlists,
+  rendered MCP names, argument placeholders, or host-specific invocation and
+  question syntax. Claude keeps its `/colormath:<skill>` namespace; Codex uses
+  its native `$` skill mentions; generic hosts invoke the same logical skill
+  names.
+
+  Release stamping and verification now treat the Claude and Codex manifests as
+  separate mandatory stamp sites. `plugin/validate.sh`, called by the existing
+  release-consistency check, verifies both packages discover the same seven
+  skills, rejects host constructs in canonical instructions, and runs the
+  Agent Skills `skills-ref` validator when it is installed. Host-specific
+  install and invocation examples remain allowed in clearly labeled docs.
+
 - **`ship` links its PR to the ticket, and holds if it did not.** Abacus has had
   `link_pull_request` since CM-00019 and nothing ever called it: ship opened the
   PR knowing exactly which ticket it came from, captured the number for its own
