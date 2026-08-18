@@ -89,7 +89,7 @@ Distinguish, out loud and in the final write-up, **what you verified** from
 Because you did step 2, you can now ask concrete multiple choice instead of an
 open survey — "should the staging sender use the same domain, or its own?"
 rather than "any thoughts on email?". Concrete options cost the user seconds,
-and they surface possibilities they hadn't considered. That's what
+and they surface possibilities they hadn't considered.
 Use the host's structured question mechanism when available, putting your
 recommendation first and saying why. Otherwise ask numbered questions in chat
 with the same concrete options.
