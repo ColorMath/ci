@@ -12,6 +12,43 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+MINOR. Behaviour added to an existing plugin skill; no gate becomes stricter and
+nothing a consumer runs can turn red without them editing anything.
+
+### Added
+
+- **`ship` links its PR to the ticket, and holds if it did not.** Abacus has had
+  `link_pull_request` since CM-00019 and nothing ever called it: ship opened the
+  PR knowing exactly which ticket it came from, captured the number for its own
+  later steps, and threw the connection away. That ticket's own description
+  predicted this would happen, and it did.
+
+  Two changes, deliberately different in kind. Step 1 links the PR immediately
+  after `gh pr create` — that is the instruction. Step 7 gains a fourth merge
+  gate that refuses to auto-merge a PR whose ticket does not name **this** PR's
+  number — that is what makes "always" mean always, because an instruction alone
+  is what an agent skips when the run is long and the gates are red.
+
+  `bugfix` and `implement-ticket` both hand off to ship rather than opening PRs
+  themselves, so all three inherit it.
+
+  Three edges are settled in the skill rather than left to judgement: a duplicate
+  link is refused and reads as **success** on a re-run; a repository that is not
+  connected to the board is a **hold**, never a guess at which repository was
+  meant; and a branch with no ticket has nothing to link and must not become a
+  spurious hold.
+
+  `allowed-tools` gains `mcp__abacus__get_board` and
+  `mcp__abacus__link_pull_request`. Without both the calls are simply
+  unavailable, which is a prerequisite rather than a detail.
+
+  **Requires an Abacus deployed with ColorMath/abacus#49.** That PR is what makes
+  the two reads this depends on exist: `get_board` returns the board's connected
+  repositories (so a repository id can be discovered at all — its schema pointed
+  there and the field did not exist), and `get_ticket` returns the ticket's
+  linked pull requests (so the merge gate has something to read on a re-run).
+  Landing this first would give ship an instruction it cannot carry out.
+
 ## v4.0.0 — 2026-08-12
 
 MAJOR. The review workflow loses a job, three inputs and three outputs. A
