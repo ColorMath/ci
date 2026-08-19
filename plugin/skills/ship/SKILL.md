@@ -2,7 +2,7 @@
 name: ship
 description: Open a PR, wait for the gates and the review, then QA the change against a running stack from the ticket's QA plan in Abacus (writing one if the ticket has none), fix every finding — blockers included — then decide once, auto-merging when clean or holding for a human. Never re-triggers the review.
 argument-hint: [optional PR title]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__abacus__get_board mcp__abacus__link_pull_request
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__abacus__get_board mcp__abacus__link_pull_request mcp__chrome-devtools__navigate_page mcp__chrome-devtools__click mcp__chrome-devtools__fill mcp__chrome-devtools__fill_form mcp__chrome-devtools__type_text mcp__chrome-devtools__press_key mcp__chrome-devtools__hover mcp__chrome-devtools__wait_for mcp__chrome-devtools__evaluate_script mcp__chrome-devtools__take_screenshot mcp__chrome-devtools__take_snapshot mcp__chrome-devtools__list_pages mcp__chrome-devtools__new_page mcp__chrome-devtools__select_page mcp__chrome-devtools__list_console_messages mcp__chrome-devtools__handle_dialog
 model: claude-sonnet-4-6
 ---
 
@@ -195,11 +195,13 @@ that authenticates as each identity turns a long checklist into one loop.
   (`curl`/driver script against the running app), not by calling functions
   in-process. Record the exact request, the response, and whether it matched
   the expected result the plan states.
-- **UI items** — drive them through a browser **if one is reachable** (the
-  browser automation tools); capture what you observed. **If no browser is
-  reachable**, do not guess: leave those items marked ⚠️ unverified and say
-  plainly they need a human to click through. Never report a UI item as passed
-  on inspection of the code alone.
+- **UI items** — drive them through a real browser using the Chrome DevTools MCP
+  tools (`navigate_page`, `click`, `fill`, `take_screenshot`) or a Playwright
+  script via Bash. Navigate to the page, interact as the item describes, and
+  screenshot the result as evidence. If neither tool is available, mark the
+  item `⚠️` unverified and say what you tried — but exhaust both paths before
+  falling back to that. Never report a UI item as passed on inspection of the
+  code alone.
 - Borrow the relevant probe discipline from the `qa` skill's `references/`
   catalogs (`security.md` / `correctness.md` / `accessibility.md`) when an item
   calls for it (an authorization row, a write round-trip, a keyboard path).
@@ -325,7 +327,7 @@ Evaluate four gates against the **current** state of the branch:
      risk, not a required item."
 
    What is **not** explainable, and does block: QA that never ran at all, a
-   required UI item you couldn't drive because no browser was reachable, a stack
+   UI item left as `⚠️` instead of driven through the browser, a stack
    that wouldn't come up, or a `⚠️` with no stated reason. "I didn't get to it"
    is not an explanation. A missing ticket is **not** an excuse — step 4 writes a
    plan when there is none, so "there was nothing to QA" never satisfies this

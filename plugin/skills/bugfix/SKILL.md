@@ -2,7 +2,7 @@
 name: bugfix
 description: Take a bug report all the way from raw report to merged fix — establish the facts the report left out (which environment, which surface, the literal repro), reproduce the defect against the running stack, fix it at the layer the invariant belongs to, add a regression test that fails without the fix, assess whether the defect already corrupted stored data and remediate that in the same PR, then hand off to /colormath:ship. Use this whenever someone reports something broken — a ticket key for a filed bug, a bug report, a pasted stack trace or error log, "why is X doing Y", "users can't Z", a production incident, a written-up findings doc — even when they never say the word "bug". Not for sweeping a whole feature area for unknown problems (that's /colormath:qa), and not for shipping a branch that's already fixed (that's /colormath:ship).
 argument-hint: [a ticket key (CM-00012), or the report itself — prose, a pasted error/log, or a path to a report file]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__chrome-devtools__navigate_page mcp__chrome-devtools__click mcp__chrome-devtools__fill mcp__chrome-devtools__fill_form mcp__chrome-devtools__type_text mcp__chrome-devtools__press_key mcp__chrome-devtools__hover mcp__chrome-devtools__wait_for mcp__chrome-devtools__evaluate_script mcp__chrome-devtools__take_screenshot mcp__chrome-devtools__take_snapshot mcp__chrome-devtools__list_pages mcp__chrome-devtools__new_page mcp__chrome-devtools__select_page mcp__chrome-devtools__list_console_messages mcp__chrome-devtools__handle_dialog
 ---
 
 Turn the bug report in "$ARGUMENTS" into a merged fix.
@@ -99,10 +99,10 @@ environment out from under someone), and get credentials at the privilege tier
 the report names — not just the most convenient admin account.
 
 Reproduce at **the same surface and the same tier** the reporter used. Drive it
-over the real transport — a browser for UI, `curl` or a small driver script for
-API and backend paths — rather than calling functions in-process, because
-in-process calls skip exactly the middleware, validation and serialization
-layers where the defect often lives.
+over the real transport — the Chrome DevTools MCP tools or Playwright for UI,
+`curl` or a small driver script for API and backend paths — rather than calling
+functions in-process, because in-process calls skip exactly the middleware,
+validation and serialization layers where the defect often lives.
 
 **Write the repro down as something runnable.** You'll use it three more times:
 to confirm the diagnosis, to prove the fix, and as the seed of the regression

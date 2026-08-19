@@ -2,7 +2,7 @@
 name: qa
 description: Thoroughly QA a feature against the running platform — bring the stack up, find seeded accounts at every privilege tier, then probe correctness, security, and accessibility, proving each finding before reporting it. Produces a ranked findings list you pick from, fixes what you pick, and hands off to /colormath:ship. Use this whenever the user wants to QA, test, audit, review, or "go through" a feature or area of the platform, asks "what's broken in X" or "is X solid", wants a pre-release or pre-demo check, or mentions a QA round — even when they never say the word "QA".
 argument-hint: [focus area, e.g. "the invite flow" or "the MCP endpoints"]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__chrome-devtools__navigate_page mcp__chrome-devtools__click mcp__chrome-devtools__fill mcp__chrome-devtools__fill_form mcp__chrome-devtools__type_text mcp__chrome-devtools__press_key mcp__chrome-devtools__hover mcp__chrome-devtools__wait_for mcp__chrome-devtools__evaluate_script mcp__chrome-devtools__take_screenshot mcp__chrome-devtools__take_snapshot mcp__chrome-devtools__list_pages mcp__chrome-devtools__new_page mcp__chrome-devtools__select_page mcp__chrome-devtools__list_console_messages mcp__chrome-devtools__handle_dialog
 ---
 
 QA the focus area in "$ARGUMENTS" against the **running** platform, then fix
@@ -61,6 +61,14 @@ authorization matrix is dozens of calls, and a loop that prints
 `allowed/denied` against `expected` turns it into a single readable table you
 can paste into the report. Hand-running those calls is where QA sessions
 quietly run out of budget and start sampling instead of covering.
+
+**For UI surfaces, drive a real browser.** Use the Chrome DevTools MCP tools
+(`navigate_page`, `click`, `fill`, `take_screenshot`) or a Playwright script via
+Bash. Navigate to each page, interact with it, and screenshot what you observe.
+If neither tool is available, mark UI items `⚠️` unverified and say what you
+tried — but exhaust both paths before falling back to that. Code inspection
+cannot find the bugs that only appear in the rendered page — CSP bypasses,
+missing form validation, broken state after navigation.
 
 **Side effects.** Treat local state as yours: write rows, upload files, create
 and revoke credentials. Record a baseline first (row counts for the tables
