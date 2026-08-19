@@ -2,7 +2,7 @@
 name: implement-ticket
 description: Take a planned ticket all the way to a shipped PR — check its plan still matches the code, ask only what genuinely blocks, build it at the layer the plan names, execute its QA plan against the running stack, then hand off to /colormath:ship. Use this when someone says to implement, build, do, or work a ticket that has already been groomed, or names a ticket key and says "go". Not for grooming (that's /colormath:refine-ticket) and not for a defect report (that's /colormath:bugfix).
 argument-hint: [ticket key, e.g. CM-00012]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
+allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__chrome-devtools__navigate_page mcp__chrome-devtools__click mcp__chrome-devtools__fill mcp__chrome-devtools__fill_form mcp__chrome-devtools__type_text mcp__chrome-devtools__press_key mcp__chrome-devtools__hover mcp__chrome-devtools__wait_for mcp__chrome-devtools__evaluate_script mcp__chrome-devtools__take_screenshot mcp__chrome-devtools__take_snapshot mcp__chrome-devtools__list_pages mcp__chrome-devtools__new_page mcp__chrome-devtools__select_page mcp__chrome-devtools__list_console_messages mcp__chrome-devtools__handle_dialog
 ---
 
 Implement the ticket in "$ARGUMENTS", QA it, and ship it.
@@ -124,10 +124,15 @@ authorization items need the *wrong* role as well as the right one, and one
 admin account proves nothing about access control.
 
 Work every item and record what you observed: the request and response, the row
-you read back, the screen state. Drive UI items through a browser if one is
-reachable; if none is, mark them `⚠️` unverified and say so plainly rather than
-inferring them from the code you just wrote — which is the least trustworthy
-possible source for whether the UI works.
+you read back, the screen state.
+
+**Drive every UI item through a real browser.** Use the Chrome DevTools MCP tools
+(`navigate_page`, `click`, `fill`, `take_screenshot`) or a Playwright script via
+Bash. Navigate to the page, interact with it the way the QA item describes, and
+screenshot the result as evidence. A UI item verified only by reading the code
+you just wrote is not verified — it is the least trustworthy source for whether
+the UI works. If neither tool is available, mark the item `⚠️` unverified and
+say what you tried — but exhaust both paths before falling back to that.
 
 Anything that fails is yours to fix now, then re-run the item. A QA plan item
 that fails and gets shipped anyway is worse than one nobody ran, because the
