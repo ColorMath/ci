@@ -12,6 +12,8 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+## v4.1.0 — 2026-08-19
+
 MINOR. Behaviour added to an existing plugin skill; no gate becomes stricter and
 nothing a consumer runs can turn red without them editing anything.
 
