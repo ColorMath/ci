@@ -1,11 +1,11 @@
 ---
 name: refine-initiative
-description: Turn a thin initiative into one a team could build from — read it and its feature definitions, investigate the architecture it lands in, interview the person who filed it until the picture is complete, then rewrite the initiative and every feature with the background and structure implementation needs. Use this whenever someone wants an initiative refined, fleshed out, scoped, designed, "made real", or checked before it starts building — or names an initiative and asks what it would actually take. Stops short of code-level plans — those belong on the tickets (/colormath:refine-ticket), and this is the layer above.
-argument-hint: [initiative key, e.g. CM-00007 — or enough of the title to find it]
-allowed-tools: Bash Read Grep Glob AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__add_feature mcp__abacus__update_feature mcp__abacus__move_feature mcp__abacus__list_boards mcp__abacus__list_tickets
+description: Turn a thin initiative into one a team can build from — read it and its feature definitions, investigate the target architecture, interview the filer until the picture is complete, then rewrite the initiative and features with the necessary background and structure. Use when asked to refine, flesh out, scope, design, make real, or preflight an initiative. Stops above code-level ticket plans, which belong to refine-ticket.
+compatibility: Requires filesystem read access, a structured question mechanism or numbered chat fallback, and Abacus MCP get_ticket, update_ticket, add_comment, add_feature, update_feature, move_feature, list_boards, and list_tickets.
 ---
 
-Refine the initiative named in "$ARGUMENTS" until the team could start building
+Refine the initiative named in the current user request until the team could
+start building
 from it without coming back to ask what it meant.
 
 An initiative is **a direction, not a design**. Someone had a shape in their
@@ -22,7 +22,7 @@ lines into four paragraphs of fluent prose that add words and no information,
 none of it checked against the codebase. The second is **designing the code** —
 sliding down into file-by-file steps, function signatures, and schema DDL. That
 is a different job at a different altitude, done per ticket, later, by
-`/colormath:refine-ticket`. This skill's altitude is: *what is being built, in
+the `refine-ticket` skill. This skill's altitude is: *what is being built, in
 what shape, against what that already exists, and does it hold together.*
 
 The spine is **read → investigate → interview → draft → confirm → write**.
@@ -31,13 +31,13 @@ round. Refer to the initiative by its **key** (`CM-00007`) throughout.
 
 ## 1. Read the initiative, and check it is one
 
-Call `mcp__abacus__get_ticket`. It takes the key directly; case and
-zero-padding don't matter. If "$ARGUMENTS" is a title fragment, find it with
-`list_boards` then `list_tickets`, and confirm which one you landed on before
-doing anything else.
+Call Abacus MCP `get_ticket`. It takes the key directly; case and zero-padding
+don't matter. If the current request contains a title fragment, find it with
+Abacus MCP `list_boards` then Abacus MCP `list_tickets`, and confirm which one
+you landed on before doing anything else.
 
 **Check `type` is `initiative`.** If it isn't, stop. Say what it is, and point
-at `/colormath:refine-ticket`, which is the right tool for a ticket. Do not
+at the `refine-ticket` skill, which is the right tool for a ticket. Do not
 quietly refine a feature as if it were an initiative — the deliverable is
 shaped differently and would be wrong.
 
@@ -54,8 +54,9 @@ shaped differently and would be wrong.
   already cut are the reason it is locked.
 
 Then read all of it, and mean it: description, **every feature definition** in
-order, **every comment**, the tickets already filed under it (`get_ticket`
-returns the children — the board tools hide them), its release, its lane.
+order, **every comment**, the tickets already filed under it (Abacus MCP
+`get_ticket` returns the children — the board tools hide them), its release,
+its lane.
 Comments are where decisions already made go to hide, and refining an initiative
 into a shape that contradicts a decision recorded in its own thread is an
 avoidable embarrassment.
@@ -69,8 +70,8 @@ This is where most of the time should go, and it is what separates a refined
 initiative from a padded one. You are building the picture the filer assumed
 everyone had.
 
-**Start with the written decisions.** `AGENTS.md` / `CLAUDE.md`, the ADRs in
-`docs/adr/`, the rules files. These state the invariants the initiative must
+**Start with the written decisions.** Read the repository instruction files,
+the ADRs in `docs/adr/`, and the rules files. These state the invariants the initiative must
 live inside — layering, tenancy scoping, ordering rules, audit obligations,
 authorization defaults, naming. An initiative that violates one of these is the
 single most valuable thing to catch, and you catch it here or not at all.
@@ -113,8 +114,9 @@ form. But it earns its cost only because step 2 happened first: you are asking
 someone to choose between real options, not to explain their own idea back to
 you.
 
-Use `AskUserQuestion` with concrete options, recommendation first, and say why
-it's your recommendation. **Batch into rounds** — up to four questions a round,
+Use the host's structured question mechanism when available, with concrete
+options, recommendation first, and the reason for it. Otherwise ask the same
+numbered questions in chat. **Batch into rounds** — up to four questions a round,
 and let each round's answers reshape the next. Three rounds is usually plenty;
 if you are still asking on the fourth, you are either designing the code (stop)
 or the initiative is really several (say so).
@@ -172,7 +174,7 @@ The initiative's **description** carries:
 **Stop short of code.** No file-by-file steps, no function signatures, no DDL,
 no test lists. If you catch yourself writing `services/billing.py:212`, you have
 dropped an altitude — that belongs to the ticket, and
-`/colormath:refine-ticket` will write it there later. Naming a *module* as the
+the `refine-ticket` skill will write it there later. Naming a *module* as the
 home for a feature is the right level; naming a line is not.
 
 Then each **feature definition** gets rewritten so that it is a thing someone
@@ -208,21 +210,21 @@ you did not write — so the loss is a decision rather than an accident.
 On approval, write in this order, so a failure part-way leaves something
 coherent:
 
-1. `mcp__abacus__update_ticket` with the new `description`. Pass only the fields
+1. Abacus MCP `update_ticket` with the new `description`. Pass only the fields
    you are changing; anything omitted keeps its value. Leave `plan` and
    `qa_plan` alone — an initiative is not implemented directly, and those fields
    belong to the tickets that come out of it.
-2. `mcp__abacus__update_feature` for each rewritten feature. **Both fields are
+2. Abacus MCP `update_feature` for each rewritten feature. **Both fields are
    replaced** by what you send, so send the title even when only the description
    changed, or you will clear it.
-3. `mcp__abacus__add_feature` for each new one.
-4. `mcp__abacus__move_feature` to put the list in the order you argued for.
+3. Abacus MCP `add_feature` for each new one.
+4. Abacus MCP `move_feature` to put the list in the order you argued for.
    Positions are 0-based and clamp; move one at a time and re-read if you lose
    track.
 
 Where the interview produced a decision worth keeping as a record — a rejected
-approach, the reasoning behind a scope cut — `add_comment` is its home. The
-description should read as the current intent, not its history.
+approach, the reasoning behind a scope cut — Abacus MCP `add_comment` is its
+home. The description should read as the current intent, not its history.
 
 Finish in chat with: the initiative key, what changed, what you verified against
 the code versus assumed, the open questions that survived, and the removals the
@@ -233,7 +235,7 @@ that and should not offer to.
 ## Rules
 
 - **Check it is an initiative, and check its status, first.** A ticket goes to
-  `/colormath:refine-ticket`. A building initiative is locked, and saying so
+  `refine-ticket`. A building initiative is locked, and saying so
   early is the difference between a conversation and a failed write.
 - **Investigate before you interview.** Questions from a cold read are a survey;
   questions after an architecture pass are a decision.

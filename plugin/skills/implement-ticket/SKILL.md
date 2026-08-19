@@ -1,13 +1,12 @@
 ---
 name: implement-ticket
-description: Take a planned ticket all the way to a shipped PR — check its plan still matches the code, ask only what genuinely blocks, build it at the layer the plan names, execute its QA plan against the running stack, then hand off to /colormath:ship. Use this when someone says to implement, build, do, or work a ticket that has already been groomed, or names a ticket key and says "go". Not for grooming (that's /colormath:refine-ticket) and not for a defect report (that's /colormath:bugfix).
-argument-hint: [ticket key, e.g. CM-00012]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
+description: Take a planned ticket all the way to a shipped PR — check its plan against current code, ask only what blocks, build at the planned layer, execute its QA plan against the running stack, then hand off to the ship skill. Use when asked to implement or work a ticket that has already been groomed. Not for grooming (use refine-ticket) or a defect report (use bugfix).
+compatibility: Requires shell and filesystem access, git, a locally runnable stack, host-native invocation of qa and ship, and Abacus MCP get_ticket, add_comment, list_boards, and list_tickets.
 ---
 
-Implement the ticket in "$ARGUMENTS", QA it, and ship it.
+Implement the ticket named in the current user request, QA it, and ship it.
 
-The ticket has already been groomed — `/colormath:refine-ticket` wrote a
+The ticket has already been groomed — the `refine-ticket` skill wrote a
 description, an implementation plan whose steps name real files, and a QA plan
 someone could execute. **Your job is to execute that, not to redo it.** The
 thinking happened; this is where it meets the code.
@@ -22,9 +21,10 @@ than a PR.
 
 ## 1. Read the ticket and check it is ready to build
 
-Call `mcp__abacus__get_ticket`. It takes the key directly; case and padding
-don't matter. If "$ARGUMENTS" is a title fragment, resolve it with
-`list_boards` / `list_tickets` and confirm which ticket you landed on.
+Call Abacus MCP `get_ticket`. It takes the key directly; case and padding
+don't matter. If the current request contains a title fragment, resolve it with
+Abacus MCP `list_boards` and `list_tickets`, then confirm which ticket you
+landed on.
 
 Read all of it — description, **implementation plan**, **QA plan**, every
 comment, type, and the initiative it belongs to if it has one. Comments carry
@@ -33,8 +33,9 @@ decisions made after the plan was written, and they win.
 Then check it can be implemented at all:
 
 - **No implementation plan** — stop. This skill executes a plan; it does not
-  write one. Send them to `/colormath:refine-ticket <key>` and say why: a plan
-  written by the run that implements it has never been read by anyone.
+  write one. Invoke or recommend the `refine-ticket` skill with the key and say
+  why: a plan written by the run that implements it has never been read by
+  anyone.
 - **No QA plan** — say so and ask whether to continue. You can implement without
   one, but nothing will check the result the way a groomed ticket intends, and
   the honest thing is to let them choose rather than inventing acceptance
@@ -42,7 +43,7 @@ Then check it can be implemented at all:
 - **A task** — that type carries no plans by design. It is not code work; it is
   a chore somebody does. Say so and stop.
 - **An initiative** — the wrong altitude. Its tickets are what get implemented;
-  `/colormath:plan-initiative` plans them, then this skill takes them one at a
+  the `plan-initiative` skill plans them, then this skill takes them one at a
   time.
 
 If the ticket belongs to an initiative, read that too. The initiative says what
@@ -60,9 +61,9 @@ Walk the plan step by step with the repo open. For each step:
   the change up.
 - **Has any of it already been done?** By the ticket next to it in the
   initiative, or by an unrelated PR that passed through.
-- **Do the repo's conventions still allow it?** `AGENTS.md` / `CLAUDE.md`, the
-  ADRs, the rules files. A plan that was fine in March can violate a decision
-  recorded in April, and the decision wins.
+- **Do the repo's conventions still allow it?** Read the repository instruction
+  files, ADRs, and rules files. A plan that was fine in March can violate a
+  decision recorded in April, and the decision wins.
 
 Where the plan holds, say so briefly and move on. Where it does not, that is a
 **finding**, and it goes to the user in step 3 rather than being quietly
@@ -81,10 +82,12 @@ grooming. Ask only when you genuinely cannot proceed:
 - the plan needs something the repo cannot give itself — a credential, a vendor
   account, a decision that belongs to someone else.
 
-One round, `AskUserQuestion`, concrete options, recommendation first. Anything
+Use one round through the host's structured question mechanism when available,
+with concrete options and the recommendation first. Otherwise ask the same
+numbered options in chat. Anything
 you can settle from the ticket, the initiative, the ADRs or the conventions is
 not a question. And if you find yourself wanting several rounds, the ticket is
-not groomed and should go back to `/colormath:refine-ticket` — say that instead
+not groomed and should go back to `refine-ticket` — say that instead
 of interviewing your way to a design.
 
 ## 4. Build it, at the layer the plan names
@@ -119,7 +122,7 @@ when you have watched the system agree. A passing test suite is not the QA plan
 — it is one of the things the QA plan usually says to check.
 
 Bring the stack up the way the repo does it (`make up-dev` or its equivalent),
-and follow `/colormath:qa`'s recon discipline for identities and seeded data —
+and follow the `qa` skill's recon discipline for identities and seeded data —
 authorization items need the *wrong* role as well as the right one, and one
 admin account proves nothing about access control.
 
@@ -139,7 +142,8 @@ minted. Local state is yours to change and yours to put back.
 ## 6. Ship it
 
 Run the repo's full local gate mirror once (`make preflight`) so an avoidable
-failure does not cost a CI round trip. Then invoke `/colormath:ship`, which
+failure does not cost a CI round trip. Then invoke the `ship` skill through the
+host's native skill mechanism, which
 takes it the rest of the way: PR, gates, the review, a second pass over this
 same QA plan against the running stack, fixes for what turns up, and either an
 auto-merge when the PR is genuinely clean or a hold with the reason.
@@ -149,7 +153,8 @@ carries what a reviewer cannot reconstruct: **the ticket key and what it asked
 for**, **where the plan held and where it did not**, **the QA plan's results
 including anything unverified**, and any deviation you made and why.
 
-When ship comes back, `add_comment` on the ticket with the outcome — the PR
+When ship comes back, call Abacus MCP `add_comment` on the ticket with the
+outcome — the PR
 link, whether it merged or is held, and the deviations. That comment is how the
 ticket stops being a plan and becomes a record. Leave the ticket's own fields
 alone: `plan` and `qa_plan` are what was intended, and the comment is what
@@ -164,7 +169,7 @@ it seems useful, and let them.
 
 - **Execute the plan; don't rewrite it.** No re-grooming, no "improving" the
   plan silently. Where it is wrong, say so and decide with the user.
-- **A ticket with no plan goes back to `/colormath:refine-ticket`.** Writing the
+- **A ticket with no plan goes back to `refine-ticket`.** Writing the
   plan and implementing it in the same breath means nobody ever reviewed the
   plan.
 - **Never work on the default branch**, and never merge by hand — `ship` owns

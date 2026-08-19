@@ -61,8 +61,9 @@ consumer) arrives with the Copier channel.
 
 ### The invariant
 
-> On `main`, at every commit: every version this repo writes down agrees, equals
-> the newest tag reachable from `HEAD`, and that tag exists.
+> On `main`, at every commit: every version this repo writes down — including
+> both host plugin manifests — agrees, equals the newest tag reachable from
+> `HEAD`, and that tag exists.
 
 Consumers pin exact tags, and the stamps are how colormath fetches its own
 scripts at that pin. Break the invariant in one direction — a stamp naming a
@@ -79,6 +80,10 @@ remembered. So **stamps move only in the release commit**, which is tagged with
 the version it stamps in a single `git push --atomic` — git updates both refs
 or neither. There is no window to forget about, and the invariant is therefore
 true continuously, including on the release commit itself.
+
+The same verifier also checks that both plugin manifests expose the one
+canonical `plugin/skills/` tree, that all seven skills remain portable Agent
+Skills, and that the reference `skills-ref` validator passes when installed.
 
 That is what makes `release-consistency` safe to run as a blocking check in CI,
 despite the warning under [Drift detection](#drift-detection-steady-state)

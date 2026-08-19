@@ -161,6 +161,14 @@ verify_vendored_copies() {
 	done
 }
 
+verify_plugin_packaging() {
+	if "$COLORMATH_ROOT/plugin/validate.sh"; then
+		pass "shared Agent Skills and Claude/Codex packaging are valid"
+	else
+		fail "shared Agent Skills or plugin packaging validation failed"
+	fi
+}
+
 verify_expect_is_a_legal_next_tag() {
 	local version="$1" newest
 	newest=$(newest_reachable_tag)
@@ -197,21 +205,24 @@ verify_expect_is_a_legal_next_tag() {
 # Audit an already-published tag by reading its blobs directly. No checkout, so
 # this is safe to run against any tag from a dirty working tree.
 audit_tag() {
-	local tag="$1" g m p problems=""
+	local tag="$1" g m pc px problems=""
 	# Early tags predate some of these files entirely; a missing blob is "-",
 	# not an error, so `|| true` guards each pipeline against pipefail.
 	g=$(git -C "$COLORMATH_ROOT" show "$tag:.github/workflows/gates.yml" 2>/dev/null |
 		awk '/^      colormath-ref:/{f=1;next} f&&/^      [a-z]/{exit} f&&/^        default:/{gsub(/^        default: *"?|"? *$/,"");print;exit}' || true)
 	m=$(git -C "$COLORMATH_ROOT" show "$tag:Makefile.colormath" 2>/dev/null |
 		sed -n 's/^COLORMATH_REF[[:space:]]*=[[:space:]]*\(v[0-9][0-9.]*\).*$/\1/p' | head -1 || true)
-	p=$(git -C "$COLORMATH_ROOT" show "$tag:plugin/.claude-plugin/plugin.json" 2>/dev/null |
+	pc=$(git -C "$COLORMATH_ROOT" show "$tag:plugin/.claude-plugin/plugin.json" 2>/dev/null |
+		sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*$/v\1/p' | head -1 || true)
+	px=$(git -C "$COLORMATH_ROOT" show "$tag:plugin/.codex-plugin/plugin.json" 2>/dev/null |
 		sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*$/v\1/p' | head -1 || true)
 
 	[ -n "$g" ] && [ "$g" != "$tag" ] && problems="${problems}gates=$g "
 	[ -n "$m" ] && [ "$m" != "$tag" ] && problems="${problems}makefile=$m "
-	[ -n "$p" ] && [ "$p" != "$tag" ] && problems="${problems}plugin=$p "
+	[ -n "$pc" ] && [ "$pc" != "$tag" ] && problems="${problems}claude-plugin=$pc "
+	[ -n "$px" ] && [ "$px" != "$tag" ] && problems="${problems}codex-plugin=$px "
 
-	printf '%-10s %-10s %-10s %-10s %s\n' "$tag" "${g:--}" "${m:--}" "${p:--}" \
+	printf '%-10s %-10s %-10s %-10s %-10s %s\n' "$tag" "${g:--}" "${m:--}" "${pc:--}" "${px:--}" \
 		"$([ -n "$problems" ] && echo "DRIFTED: $problems" || echo "consistent")"
 }
 
@@ -221,7 +232,7 @@ main() {
 		# Advisory only: never exits non-zero. Published tags are immutable in
 		# practice — consumers are pinned to them — so this reports history, it
 		# does not gate anything.
-		printf '%-10s %-10s %-10s %-10s %s\n' TAG GATES MAKEFILE PLUGIN STATUS
+		printf '%-10s %-10s %-10s %-10s %-10s %s\n' TAG GATES MAKEFILE CLAUDE CODEX STATUS
 		local t
 		for t in $(git -C "$COLORMATH_ROOT" tag --sort=v:refname); do audit_tag "$t"; done
 		echo
@@ -232,7 +243,7 @@ main() {
 		local tag
 		tag=$(normalize_version "${2:?usage: verify.sh --tag vX.Y.Z}")
 		tag_exists_locally "$tag" || die "no such tag: $tag"
-		printf '%-10s %-10s %-10s %-10s %s\n' TAG GATES MAKEFILE PLUGIN STATUS
+		printf '%-10s %-10s %-10s %-10s %-10s %s\n' TAG GATES MAKEFILE CLAUDE CODEX STATUS
 		audit_tag "$tag"
 		return 0
 		;;
@@ -244,12 +255,14 @@ main() {
 		verify_expect_is_a_legal_next_tag "$version"
 		verify_doc_placeholders
 		verify_vendored_copies
+		verify_plugin_packaging
 		;;
 	"")
 		echo "Verifying release consistency..."
 		verify_worktree
 		verify_doc_placeholders
 		verify_vendored_copies
+		verify_plugin_packaging
 		;;
 	*)
 		die "unknown argument: $1"

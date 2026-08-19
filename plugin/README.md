@@ -1,9 +1,20 @@
 # colormath plugin
 
-Claude Code skills for repos built on the colormath (ColorMath/ci) shared
-infrastructure. Install via the marketplace at the repo root — see the
-[main README](../README.md#optional-claude-code-plugin) — then invoke each
-skill as `/colormath:<skill>`.
+Seven shared Agent Skills for repos built on the colormath (ColorMath/ci)
+infrastructure. `skills/` is the sole canonical source; Claude Code discovers it
+through `.claude-plugin/plugin.json`, Codex through `.codex-plugin/plugin.json`,
+and other Agent Skills-compatible hosts can install the same directories
+directly. See the [main README](../README.md#optional-agent-plugin) for complete
+installation examples.
+
+## Host-specific invocation examples
+
+These examples are intentionally host-specific documentation; host syntax does
+not appear in the canonical `SKILL.md` files.
+
+- **Claude Code:** `/colormath:ship`, `/colormath:qa the invite flow`
+- **Codex:** `$colormath:ship`, `$colormath:qa QA the invite flow`
+- **Generic Agent Skills host:** `Use the ship skill for the current branch.`
 
 Skills here encode the colormath *contract* — gate check names, comment
 markers, make endpoints. That's the test for whether a skill belongs in this
@@ -11,7 +22,7 @@ plugin: if it would work in any repo, it goes elsewhere; if it greps for
 `gates / *` or `## Thermonuclear Review`, it lives here, so a release that
 changes the contract ships the matching skill change in the same diff.
 
-## `/colormath:ship` — PR pipeline end to end
+## `ship` — PR pipeline end to end
 
 Takes the current branch through the full PR pipeline and stops at a
 recommendation:
@@ -72,20 +83,18 @@ PR comment first) — otherwise it holds and explains.
 - The Abacus MCP server, for step 4's `qa_plan` lookup and write-back. Without
   it the step still runs — ship drafts the plan in the PR — but nothing is read
   from or recorded on the ticket.
-- For step 4, a locally runnable stack (run commands + ports in
-  `AGENTS.md` / `CLAUDE.md`) and seeded accounts — same prerequisites as
-  `/colormath:qa`, whose `references/` it reuses. A browser is optional: UI
+- For step 4, a locally runnable stack (run commands and ports in the
+  repository's instruction files) and seeded accounts — same prerequisites as
+  `qa`, whose `references/` it reuses. A browser is optional: UI
   checklist items are driven through one when reachable and marked `⚠️`
   unverified when not.
-- The skill's `allowed-tools` are broad (`Bash`, plus read/edit/write, `Skill`,
-  `AskUserQuestion`) because step 4 drives the local stack, which no narrow
-  `gh`/`git` allowlist covers; consumer repos can mirror that in
-  `.claude/settings.json` permissions to avoid prompts (see intendent for a
-  worked example).
+- The host must provide general shell and filesystem access because step 4
+  drives the local stack. Each skill's standard `compatibility` field lists the
+  complete required capabilities.
 
-## `/colormath:qa` — QA a feature, then ship the fixes
+## `qa` — QA a feature, then ship the fixes
 
-Takes a focus area (`/colormath:qa the invite flow`) and QAs it against the
+Takes a focus area such as “the invite flow” and QAs it against the
 **running** stack, on the principle that a finding is a claim about a running
 system and only counts once you've reproduced it:
 
@@ -107,7 +116,7 @@ system and only counts once you've reproduced it:
    what came back clean and what wasn't covered; you pick what to fix.
 6. **Fix, restore, ship** — re-runs each original repro against the running
    system (a green unit test isn't proof the bug is gone), undoes its test
-   data and config changes, then hands off to `/colormath:ship`.
+   data and config changes, then hands off to `ship`.
 
 Local state is fair game — it writes rows, uploads files, mints credentials —
 but it stops and asks before anything leaves the machine, because a dev `.env`
@@ -115,18 +124,18 @@ often holds a live provider key.
 
 **Prerequisites:**
 
-- A locally runnable stack, with the run commands and ports documented in
-  `AGENTS.md` / `CLAUDE.md` (the skill reads these first).
+- A locally runnable stack, with the run commands and ports documented in the
+  repository's instruction files (the skill reads these first).
 - Seeded demo data with known accounts, ideally at several privilege tiers.
 - `make preflight` and the `gates / *` check names — step 4 uses them to tell
   a genuine finding from local tool-version drift, and defers to CI when the
   two disagree.
-- `/colormath:ship` for the handoff in step 6.
+- `ship` for the handoff in step 6.
 
-## `/colormath:bugfix` — a bug report, all the way to a merged fix
+## `bugfix` — a bug report, all the way to a merged fix
 
-Takes a bug report (`/colormath:bugfix users can't log in with the account
-they just created`) and carries it end to end, on the principle that a report
+Takes a bug report such as “users can't log in with the account they just
+created” and carries it end to end, on the principle that a report
 is *evidence, not a specification* — the expensive failure is forming a
 plausible theory and proving it against the wrong environment or surface:
 
@@ -163,20 +172,20 @@ plausible theory and proving it against the wrong environment or surface:
    migration tested against locally-constructed broken data, and hands over
    what no script can recover instead of guessing at it.
 6. **Ship** — commits to `fix/<slug>`, runs `make preflight` once, then hands
-   off to `/colormath:ship` with a PR body carrying the report, the repro, the
+   off to `ship` with a PR body carrying the report, the repro, the
    cause, why the fix sits at that layer, and the remediation.
 
 **Prerequisites:**
 
-- A locally runnable stack with run commands and ports in `AGENTS.md` /
-  `CLAUDE.md`, and seeded accounts at several privilege tiers — same
-  prerequisites as `/colormath:qa`, whose `references/recon.md` step 2 reads.
-- `make preflight` (step 6) and `/colormath:ship` for the handoff.
+- A locally runnable stack with run commands and ports in the repository's
+  instruction files, and seeded accounts at several privilege tiers — same
+  prerequisites as `qa`, whose `references/recon.md` step 2 reads.
+- `make preflight` (step 6) and `ship` for the handoff.
 - A browser is optional but makes UI-surface reproduction far more direct.
 
-## `/colormath:refine-ticket` — groom a ticket until it can be worked
+## `refine-ticket` — groom a ticket until it can be worked
 
-Takes a ticket key (`/colormath:refine-ticket CM-00001`) and turns a one-line
+Takes a ticket key such as `CM-00001` and turns a one-line
 reminder into something someone could pick up cold, on the principle that a
 ticket is *a reminder, not a specification* — it carries the trigger its author
 wrote down and none of the context they had in their head:
@@ -228,9 +237,9 @@ deliverable instead of a dutiful plan.
 - Nothing else: no running stack, no `gh`, no gates. The deliverable is the
   ticket.
 
-## `/colormath:refine-initiative` — design an initiative before it is built
+## `refine-initiative` — design an initiative before it is built
 
-Takes an initiative key (`/colormath:refine-initiative CM-00007`) and turns a
+Takes an initiative key such as `CM-00007` and turns a
 direction into something a team could build from, on the principle that an
 initiative is *a direction, not a design* — a title, a handful of feature lines,
 and none of the connective tissue that makes them buildable:
@@ -244,7 +253,7 @@ and none of the connective tissue that makes them buildable:
    comment, and the tickets already filed under it (which only `get_ticket`
    returns).
 3. **Investigate the architecture before asking anything** — the written
-   decisions first (`AGENTS.md`, `docs/adr/`, rules files), then the code each
+   decisions first (repository instructions, `docs/adr/`, rules files), then the code each
    feature lands in: does it already exist, which layer owns it, what it forces
    (a table, a migration, an event type, a deploy ordering), what it collides
    with, whether each feature is implementable as written, and what the feature
@@ -266,7 +275,7 @@ and none of the connective tissue that makes them buildable:
    `update_feature` / `add_feature` / `move_feature`.
 
 It **stops short of code**. No file-by-file steps, no signatures, no DDL, no test
-lists — that is the ticket's altitude, and `/colormath:refine-ticket` writes it
+lists — that is the ticket's altitude, and `refine-ticket` writes it
 there later. It never bends an architectural rule silently: if the initiative
 needs one to move, that is a question and then a line in the write-up. And it
 **never starts building** — that transition is one-way, locks the features and
@@ -288,9 +297,9 @@ it always sends the title.
   mode the skill exists to prevent.
 - Nothing else: no running stack, no `gh`, no gates.
 
-## `/colormath:plan-initiative` — plan a whole initiative, in order
+## `plan-initiative` — plan a whole initiative, in order
 
-Takes an initiative key (`/colormath:plan-initiative CM-00007`) and runs
+Takes an initiative key such as `CM-00007` and runs
 `refine-ticket` over every ticket under it, one at a time, in build order:
 
 1. **Check it can be planned** — it is an initiative, and its tickets exist. They
@@ -303,7 +312,7 @@ Takes an initiative key (`/colormath:plan-initiative CM-00007`) and runs
    user is about to sit through. A seven-ticket initiative is a long session, and
    someone who knows that up front can say "just the first three today".
 3. **Plan each one with its place in the sequence** — invokes
-   `/colormath:refine-ticket` with the key first, then the context that skill
+   `refine-ticket` with the key first, then the context that skill
    cannot see: the initiative and its settled decisions, "ticket 3 of 7", what
    came **before** it and *what those plans actually decided*, what comes
    **after** it so this one doesn't absorb it, and the feature definition it was
@@ -329,9 +338,9 @@ building.
 `refine-ticket` call does a real code pass), and an initiative that has already
 started building. Nothing else.
 
-## `/colormath:implement-ticket` — build a planned ticket and ship it
+## `implement-ticket` — build a planned ticket and ship it
 
-Takes a ticket key (`/colormath:implement-ticket CM-00012`) and takes a groomed
+Takes a ticket key such as `CM-00012` and takes a groomed
 ticket the rest of the way. The thinking already happened in `refine-ticket`;
 this is where it meets the code:
 
@@ -358,7 +367,7 @@ this is where it meets the code:
 5. **Execute the QA plan against the running stack** — every item gets an
    observation, `⚠️` when no browser is reachable for a UI item, and a failure is
    fixed and re-run rather than shipped with the document claiming it passed.
-6. **Ship** — `make preflight`, then `/colormath:ship` for PR, gates, review, a
+6. **Ship** — `make preflight`, then `ship` for PR, gates, review, a
    second pass over the same QA plan, and the merge decision. Comments the
    outcome back onto the ticket.
 
@@ -368,15 +377,16 @@ between lanes — one board's "In Review" is another's "Staging", and guessing a
 somebody's workflow is worse than leaving it where they put it.
 
 **Prerequisites:** the **Abacus MCP server**, a checkout with the stack runnable
-(step 5 is real QA, not a test run), and `/colormath:ship`'s own prerequisites,
+(step 5 is real QA, not a test run), and `ship`'s own prerequisites,
 since it hands off there.
 
 ## Adding a skill
 
-One directory per skill: `skills/<name>/SKILL.md` with frontmatter
-(`name`, `description`, optional `argument-hint` / `allowed-tools` / `model`).
-The directory name is the command name (`/colormath:<name>`). Document the
-skill in this README, keep it consumer-agnostic (no product names, no
-hardcoded default branch), and note in the changelog which contract surfaces
-it depends on — a rename of any of them must ship with the skill update in
-the same release.
+One directory per skill: `skills/<name>/SKILL.md` with standard Agent Skills
+frontmatter (`name`, `description`, and `compatibility` when capabilities are
+required). Document the skill in this README, keep it consumer-agnostic (no
+host-rendered tool names, product names, or hardcoded default branch), and note
+in the changelog which contract surfaces it depends on — a rename of any of
+them must ship with the skill update in the same release. Run `./validate.sh`
+before submitting a change; it uses `skills-ref` when available and always runs
+the repository's portability and dual-manifest checks.

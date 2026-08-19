@@ -1,0 +1,25 @@
+{
+  "name": "colormath",
+  "description": "Agent Skills for repos built on the colormath (ColorMath/ci) shared infrastructure — gates, review pipeline, QA, ticket refinement, and shipping.",
+  "version": "4.0.0",
+  "author": {
+    "name": "Craig Booth"
+  },
+  "homepage": "https://github.com/ColorMath/ci",
+  "repository": "https://github.com/ColorMath/ci",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "colormath",
+    "shortDescription": "QA, refine, implement, and ship with colormath",
+    "longDescription": "Seven shared Agent Skills for refining Abacus work, implementing changes, running evidence-based QA, and shipping through colormath gates and review.",
+    "developerName": "ColorMath",
+    "category": "Developer Tools",
+    "capabilities": ["Shell", "Filesystem", "GitHub", "MCP"],
+    "defaultPrompt": [
+      "Use colormath to QA this feature.",
+      "Refine this Abacus ticket into an implementation plan.",
+      "Ship the current branch through the colormath pipeline."
+    ]
+  }
+}

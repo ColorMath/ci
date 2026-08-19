@@ -1,9 +1,7 @@
 ---
 name: ship
 description: Open a PR, wait for the gates and the review, then QA the change against a running stack from the ticket's QA plan in Abacus (writing one if the ticket has none), fix every finding — blockers included — then decide once, auto-merging when clean or holding for a human. Never re-triggers the review.
-argument-hint: [optional PR title]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__update_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets mcp__abacus__get_board mcp__abacus__link_pull_request
-model: claude-sonnet-4-6
+compatibility: Requires shell and filesystem access, git, gh, network access, and a locally runnable stack. Ticket-backed runs use Abacus MCP get_ticket, update_ticket, add_comment, list_boards, list_tickets, get_board, and link_pull_request.
 ---
 
 Ship the current branch through the PR pipeline end to end. This repo uses
@@ -12,20 +10,21 @@ thermonuclear **review**. QA does not come from CI: the **QA plan lives on the
 ticket in Abacus**, and you execute it against a running stack. You **fix** what
 the review and the QA turn up — blockers included, without asking — and end at a
 **merge decision** that either auto-merges the PR (when it's genuinely clean) or
-holds and asks for a human. Use the `gh` CLI for every GitHub operation. Give me
-a one-line status at each step.
+holds and asks for a human. Use the `gh` CLI for every GitHub operation. Give
+the user a one-line status at each step.
 
 The shape is linear and runs **once**: review → respond + QA → decide. There is
 no second review round; see step 5.
 
-Broad `Bash` is in `allowed-tools` on purpose: step 4 drives the local stack
-(`make up`, DB queries, `curl`, throwaway driver scripts) to actually run the
-QA plan, which no narrow `gh`/`git` allowlist can cover.
+The host must provide general shell and filesystem capabilities: step 4 drives
+the local stack (`make up`, DB queries, `curl`, throwaway driver scripts) to
+actually run the QA plan.
 
 ## 1. Open the PR, and record it on the ticket
 - Push the branch if needed (`git push -u origin HEAD`).
-- Create the PR with `gh pr create`. Use "$ARGUMENTS" as the title if provided,
-  otherwise derive one from the branch's commits. Write a body that summarizes
+- Create the PR with `gh pr create`. Use a PR title from the current user
+  request if provided; otherwise derive one from the branch's commits. Write a
+  body that summarizes
   the diff and calls out anything a reviewer should look at.
 - Capture the PR number for the steps below.
 
@@ -37,11 +36,11 @@ message, if at all. Four calls:
 1. **Identify the ticket** by the rule in step 4's *Find the ticket* — the same
    rule, not a second one. If you cannot say which ticket this PR implements,
    there is nothing to link and nothing below applies: say so and carry on.
-2. `mcp__abacus__get_ticket` on it, for its `board_id`.
-3. `mcp__abacus__get_board` on that board, and match its `repositories` on
+2. Abacus MCP `get_ticket` on it, for its `board_id`.
+3. Abacus MCP `get_board` on that board, and match its `repositories` on
    `full_name` against the repository you actually pushed to (`gh repo view
    --json nameWithOwner`).
-4. `mcp__abacus__link_pull_request` with the ticket id, that repository id, and
+4. Abacus MCP `link_pull_request` with the ticket id, that repository id, and
    the PR number.
 
 Three things that decide what to do when it does not go cleanly:
@@ -97,9 +96,8 @@ is which or you'll wait forever on the wrong one:
 
 Wait until the thermonuclear `review / review` check finishes **or** a formal
 review is submitted — whichever comes first — polling every 30s. Read the
-check state from `statusCheckRollup` (do **not** parse `gh pr checks` columns
-with awk `$1`/`$2` — this file is a skill, and `$1`/`$2` get clobbered by
-skill-argument substitution):
+check state from `statusCheckRollup`. Do **not** parse the human-facing columns
+from `gh pr checks`; their layout is not a stable interface:
 ```bash
 PR=<number>
 until \
@@ -147,9 +145,10 @@ response behavior, which is exactly the gap this covers.
 
 **Find the ticket.** Look for a key like `CM-00012` / `ID-00031` (the board's
 own prefix, then digits) in the branch name, the PR title and body, and the
-branch's commit messages. Confirm it with `mcp__abacus__get_ticket`, which takes
+branch's commit messages. Confirm it with Abacus MCP `get_ticket`, which takes
 the key directly — case and padding don't matter. If only a title fragment
-turns up, resolve it via `list_boards` / `list_tickets` and confirm which ticket
+turns up, resolve it via Abacus MCP `list_boards` and Abacus MCP `list_tickets`,
+then confirm which ticket
 you landed on. Two rules on what counts:
 - An **initiative** is the wrong altitude and a **task** carries no plans by
   design. Neither is the ticket for this PR — treat it as no ticket.
@@ -162,7 +161,7 @@ Then take exactly one of three paths:
 and reviewed, and it is the acceptance criteria this change was built against.
 If it has gone stale (a step names a file that moved, a case the diff made
 irrelevant, a gap the diff opened), **do not edit the field**. Record the
-amendment as a ticket comment via `mcp__abacus__add_comment`, saying what you
+amendment as a ticket comment via Abacus MCP `add_comment`, saying what you
 changed and why, and execute the amended version. The `qa_plan` field stays the
 record of what was intended; comments are the record of what happened.
 
@@ -171,10 +170,10 @@ the diff the way `refine-ticket` would — concrete, independently checkable
 items naming real routes, roles and expected results, not generic boilerplate;
 cover the authorization tiers the change touches, and say plainly what CI
 already covers so you don't re-test it. Write it to the ticket's `qa_plan` field
-with `mcp__abacus__update_ticket`, opening it with a line that marks its
+with Abacus MCP `update_ticket`, opening it with a line that marks its
 provenance so a later reader never mistakes it for a groomed plan:
 
-    _Authored by /colormath:ship while shipping PR #<n> — not groomed._
+    _Authored by the colormath ship skill while shipping PR #<n> — not groomed._
 
 Pass only that field. Then execute it.
 
@@ -232,7 +231,7 @@ exact repro; and a one-line note of what you did **not** cover. If everything
 passed, say so explicitly. Never truncate a finding.
 
 **Post the results to the ticket too**, when there is one: the same results as a
-ticket comment via `mcp__abacus__add_comment`, with the PR link. The ticket is
+ticket comment via Abacus MCP `add_comment`, with the PR link. The ticket is
 where the QA plan lives, so it is where the plan's outcome belongs — a plan
 whose results only ever existed on a PR is a plan nobody can audit later. Post
 this now; step 5 updates it if fixes change the picture.
@@ -333,7 +332,7 @@ Evaluate four gates against the **current** state of the branch:
    explicitly.
 
 4. **The ticket carries a link to this PR.** Read `pull_requests` from
-   `mcp__abacus__get_ticket` and look for **this PR's number** — not merely any
+   Abacus MCP `get_ticket` and look for **this PR's number** — not merely any
    link. A ticket already naming three other PRs does not satisfy this.
 
    This is what makes step 1's instruction mean something. An instruction on its

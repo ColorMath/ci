@@ -197,7 +197,7 @@ nothing changes). It runs one Claude agent on every non-draft PR
 
 **QA is not here.** A second `test-plan` agent used to post a `## Test Plan`
 comment on every PR; it has been removed. The QA plan belongs to the ticket in
-Abacus, where `/colormath:refine-ticket` writes it and `/colormath:ship`
+Abacus, where the `refine-ticket` skill writes it and the `ship` skill
 executes it against a running stack — the thing CI cannot do. See
 [Where QA lives](#where-qa-lives).
 
@@ -293,44 +293,46 @@ So QA belongs to the **ticket**:
 
 | Stage | Skill | What it does |
 |---|---|---|
-| Grooming | `/colormath:refine-ticket` | Writes the ticket's `qa_plan` field alongside its implementation plan |
-| Building | `/colormath:implement-ticket` | Executes that plan against a running stack as it builds |
-| Shipping | `/colormath:ship` | Re-executes it on the PR; **writes one if the ticket has none** |
+| Grooming | `refine-ticket` | Writes the ticket's `qa_plan` field alongside its implementation plan |
+| Building | `implement-ticket` | Executes that plan against a running stack as it builds |
+| Shipping | `ship` | Re-executes it on the PR; **writes one if the ticket has none** |
 
 `ship` fills an empty `qa_plan` and marks it as ship-authored, but never edits a
 groomed one — amendments go on as ticket comments, so the field stays the record
 of what was intended and the comments record what actually happened. A PR with
 no ticket still gets QA'd; the plan just lives in the PR.
 
-## Optional: Claude Code plugin
+## Optional: agent plugin
 
-This repo is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces).
-The `colormath` plugin ships skills for working in consumer repos:
-**`/colormath:ship`** takes the current branch through the whole PR pipeline
+The `plugin/` package exposes one canonical Agent Skills tree to Claude Code,
+Codex, and other hosts implementing the
+[Agent Skills standard](https://agentskills.io/specification). The `colormath`
+plugin ships seven skills for working in consumer repos:
+**`ship`** takes the current branch through the whole PR pipeline
 (open the PR, watch the gates, wait for the Thermonuclear Review, execute the
 ticket's **QA plan** against the running stack — writing one when the ticket has
 none — and post its results, fix every finding it can — blockers included) and
 ends at a gated final review that
 **auto-merges** when the PR is genuinely clean or holds and explains why;
-**`/colormath:qa`** QAs a focus area against the running stack and hands the
-fixes to `ship`; **`/colormath:bugfix`** turns a *specific* bug report into a
+**`qa`** QAs a focus area against the running stack and hands the
+fixes to `ship`; **`bugfix`** turns a *specific* bug report into a
 merged fix — establishing the facts the report omitted, reproducing the defect
 before touching code, fixing at the layer the invariant belongs to, remediating
 data the bug already corrupted, then handing off to `ship`; and
-**`/colormath:refine-ticket`** grooms a ticket until it can be worked —
+**`refine-ticket`** grooms a ticket until it can be worked —
 investigating the code *before* it asks anything, so its questions are few and
 concrete, then writing back a standalone description, an implementation plan
 whose every step names a real file, and a QA plan someone could execute; and
-**`/colormath:refine-initiative`** does the layer above for an initiative —
+**`refine-initiative`** does the layer above for an initiative —
 reading its feature definitions, investigating the architecture and decision
 records they land in, interviewing until the picture is complete, then rewriting
 the initiative and every feature with the background implementation needs, while
 stopping short of code-level plans and never starting the build; and
-**`/colormath:plan-initiative`** closes the loop between the two — running
+**`plan-initiative`** closes the loop between the two — running
 `refine-ticket` over every ticket in an initiative, in build order, injecting
 each ticket's place in the sequence and what the earlier plans decided, so the
 seams line up instead of seven independent groomings contradicting each other;
-and **`/colormath:implement-ticket`** takes a groomed ticket the rest of the way
+and **`implement-ticket`** takes a groomed ticket the rest of the way
 — checking its plan still matches the code before touching anything, building at
 the layer the plan names, executing the ticket's QA plan against the running
 stack, then handing off to `ship`. Each skill's behavior, prerequisites, and
@@ -340,14 +342,18 @@ contract dependencies are documented in [plugin/README.md](plugin/README.md).
 `implement-ticket` need the [Abacus](https://github.com/ColorMath/abacus) MCP
 server connected — the plugin's one tracker dependency.
 
-Install manually:
+### Claude Code installation and invocation
 
-```
+Claude Code uses [`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json)
+and namespaces plugin skills. Install from this repository's Claude marketplace:
+
+```text
 /plugin marketplace add ColorMath/ci
 /plugin install colormath@colormath
+/colormath:bugfix CM-00012
 ```
 
-or have a consumer repo offer it to everyone who opens it, via
+To offer it to everyone who opens a consumer repo, configure
 `.claude/settings.json`:
 
 ```json
@@ -362,6 +368,34 @@ or have a consumer repo offer it to everyone who opens it, via
   }
 }
 ```
+
+### Codex installation and invocation
+
+Codex uses [`plugin/.codex-plugin/plugin.json`](plugin/.codex-plugin/plugin.json).
+After a local or team Codex marketplace points at `plugin/`, install it with the
+marketplace's configured name and mention the skill with Codex's native `$`
+syntax:
+
+```text
+codex plugin add colormath@<marketplace-name>
+$colormath:bugfix Fix CM-00012
+```
+
+### Generic Agent Skills installation and invocation
+
+For another Agent Skills-compatible host, install each directory under
+`plugin/skills/` into that host's documented skills directory. Invoke dependent
+workflows through the host's native mechanism, or ask for them by logical name:
+
+```text
+cp -R plugin/skills/* <host-skills-directory>/
+Use the bugfix skill to fix CM-00012.
+```
+
+The canonical skills require the capabilities named in each `compatibility`
+field. Hosts may expose different tool names; the workflows intentionally refer
+to shell, filesystem, structured questions, skill invocation, browser access,
+and Abacus MCP tools by capability rather than rendered host symbol.
 
 ## Running the gates locally
 
@@ -467,7 +501,7 @@ While on `0.x`, breaking changes may land in any release.
 .github/workflows/ci.yml       # self-test: runs the suite against example/
 .github/actions/               # setup-python-poetry, setup-node, gate-summary
 .claude-plugin/                # plugin marketplace manifest
-plugin/                        # the colormath Claude Code plugin (skills)
+plugin/                        # shared Agent Skills plugin (Claude, Codex, generic hosts)
 Makefile.colormath             # shared local gate targets — vendored by consumers
 eslint.config.colormath.mjs    # shared eslint base — vendored by consumers
 AGENTS.colormath.md            # shared agent conventions — vendored by consumers

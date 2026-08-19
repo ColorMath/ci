@@ -1,11 +1,10 @@
 ---
 name: bugfix
-description: Take a bug report all the way from raw report to merged fix — establish the facts the report left out (which environment, which surface, the literal repro), reproduce the defect against the running stack, fix it at the layer the invariant belongs to, add a regression test that fails without the fix, assess whether the defect already corrupted stored data and remediate that in the same PR, then hand off to /colormath:ship. Use this whenever someone reports something broken — a ticket key for a filed bug, a bug report, a pasted stack trace or error log, "why is X doing Y", "users can't Z", a production incident, a written-up findings doc — even when they never say the word "bug". Not for sweeping a whole feature area for unknown problems (that's /colormath:qa), and not for shipping a branch that's already fixed (that's /colormath:ship).
-argument-hint: [a ticket key (CM-00012), or the report itself — prose, a pasted error/log, or a path to a report file]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion mcp__abacus__get_ticket mcp__abacus__add_comment mcp__abacus__list_boards mcp__abacus__list_tickets
+description: Take a bug report all the way from raw report to merged fix — establish the missing facts, reproduce the defect, fix the owning invariant, add a proven regression test, assess and remediate corrupted data, then hand off to the ship skill. Use whenever someone reports broken behavior, a bug ticket, stack trace, error log, production incident, or findings document. Not for sweeping a feature for unknown problems (use qa), or shipping an already-fixed branch (use ship).
+compatibility: Requires shell and filesystem access, git, a locally runnable stack, and host-native invocation of the qa and ship skills. Ticket-backed reports use Abacus MCP get_ticket, add_comment, list_boards, and list_tickets.
 ---
 
-Turn the bug report in "$ARGUMENTS" into a merged fix.
+Turn the bug report in the current user request into a merged fix.
 
 A bug report is **evidence, not a specification**. It tells you what one person
 noticed from outside the system; it rarely tells you where they were standing,
@@ -25,16 +24,16 @@ you have watched the bug happen.
 shapes, and they start differently:
 
 - **A ticket key** (`CM-00012`, `cm-12` — case and zero-padding don't matter).
-  Call `mcp__abacus__get_ticket`, which takes the key directly. Read the whole
+  Call Abacus MCP `get_ticket`, which takes the key directly. Read the whole
   thing: description, type, **every comment**, and the plan and QA plan if
   somebody groomed it. The comments are where the report actually lives once a
   bug has been discussed — the reproduction somebody finally landed on, the
   environment it was seen in, the "actually it also happens when…" that never
   made it into the description. A bug filed as a ticket has usually been talked
   about, and skipping the thread is how you re-derive what the thread already
-  settled. If "$ARGUMENTS" is a title fragment rather than a key, find it with
-  `list_boards` then `list_tickets`, and confirm which one you landed on before
-  doing anything else.
+  settled. If the current request contains a title fragment rather than a key,
+  find it with Abacus MCP `list_boards` then Abacus MCP `list_tickets`, and
+  confirm which one you landed on before doing anything else.
 - **A file** — a written-up report, an exported ticket, a QA findings doc. Read
   the whole thing first.
 - **Prose, a stack trace, or a log excerpt**, pasted straight in. A trace is
@@ -75,8 +74,9 @@ These are the unknowns that most often send a fix down the wrong path:
 surfaces turns open-ended interrogation ("which surface?") into a concrete
 multiple choice ("public signup form, invite acceptance, or admin-created
 user?"). Concrete options are dramatically cheaper for the reporter to answer
-and they surface the possibilities they hadn't considered. This is what
-`AskUserQuestion`'s option lists are for.
+and they surface the possibilities they hadn't considered.
+Use the host's structured question mechanism when available. Otherwise, ask
+numbered questions in chat with concrete options.
 
 **Ask only what changes what you'd do next**, and ask it in one batch rather
 than trickling questions out over several turns. If the answer to a question
@@ -165,8 +165,8 @@ review, and makes it harder to tell what actually fixed the reported symptom.
 
 ## 4. Fix it, and prove the fix with a regression test
 
-Make the change in the idiom of the surrounding code, following the repo's
-`AGENTS.md` / `CLAUDE.md` conventions and its layering rules.
+Make the change in the idiom of the surrounding code, following the repository's
+instruction files, conventions, and layering rules.
 
 Add a regression test **at the layer the fix lives at** — the chokepoint you
 chose in step 3, so the test guards the rule itself rather than one caller of
@@ -220,7 +220,8 @@ Ask: could this defect have written bad rows, files, or cached values? If so:
 - Commit on a branch — `fix/<short-slug>` — never on the default branch.
 - Run the repo's full local gate mirror once (`make preflight`) before handing
   off, so an avoidable failure doesn't cost a CI round trip.
-- Then invoke `/colormath:ship`, which takes it the rest of the way: PR, gates,
+- Then invoke the `ship` skill through the host's native skill mechanism. It
+  takes the change the rest of the way: PR, gates,
   review, the ticket's QA plan executed against the running stack, fixes for
   anything that turns up, and either an auto-merge when it's genuinely clean or
   a hold with the reason.
@@ -248,10 +249,11 @@ anything you deliberately left for a human.
 - Local state is yours to mutate while reproducing — record a baseline first so
   you can put it back, and clean up the rows, files and credentials you created.
 - **If it came from a ticket, close the loop on it.** When ship comes back,
-  `add_comment` with the outcome — the PR link, whether it merged or is held,
+  call Abacus MCP `add_comment` with the outcome — the PR link, whether it
+  merged or is held,
   the cause you found, and what you deliberately left alone. Leave the ticket's
   own fields alone: the description is what was reported, and the comment is
   what happened. Do not move it between lanes; lane meaning is per board and
   the person who filed it decides when it is done.
-- Your job ends where `/colormath:ship` takes over, and ship's own rules apply
+- Your job ends where the `ship` skill takes over, and ship's own rules apply
   from there.

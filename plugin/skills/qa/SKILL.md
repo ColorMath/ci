@@ -1,11 +1,11 @@
 ---
 name: qa
-description: Thoroughly QA a feature against the running platform — bring the stack up, find seeded accounts at every privilege tier, then probe correctness, security, and accessibility, proving each finding before reporting it. Produces a ranked findings list you pick from, fixes what you pick, and hands off to /colormath:ship. Use this whenever the user wants to QA, test, audit, review, or "go through" a feature or area of the platform, asks "what's broken in X" or "is X solid", wants a pre-release or pre-demo check, or mentions a QA round — even when they never say the word "QA".
-argument-hint: [focus area, e.g. "the invite flow" or "the MCP endpoints"]
-allowed-tools: Bash Read Edit Write Grep Glob Skill AskUserQuestion
+description: Thoroughly QA a feature against the running platform — bring the stack up, find seeded accounts at every privilege tier, then probe correctness, security, and accessibility, proving each finding before reporting it. Produces a ranked findings list for the user to select from, fixes the selection, and hands off to ship. Use when asked to QA, test, audit, review, or go through a feature, find what's broken, or run a pre-release or pre-demo QA round.
+compatibility: Requires shell and filesystem access, a locally runnable stack, optional browser automation for UI checks, and host-native invocation of the ship skill. Must support structured multi-selection or numbered chat fallback.
 ---
 
-QA the focus area in "$ARGUMENTS" against the **running** platform, then fix
+QA the focus area in the current user request against the **running** platform,
+then fix
 what the user picks and hand off to shipping.
 
 The thing that makes this useful rather than theatre: a finding is a claim
@@ -28,8 +28,8 @@ Note the trust boundaries you cross — anywhere untrusted input arrives (a form
 an API argument, an uploaded file, an inbound email, a webhook) and anywhere
 output is handed back to a browser. Those are where the interesting bugs live.
 
-Read `AGENTS.md` / `CLAUDE.md` first. They carry the run commands, ports, test
-invocations, and house rules, and they'll tell you which directories are
+Read the repository's instruction files first. They carry the run commands,
+ports, test invocations, and house rules, and they'll tell you which directories are
 generated or vendored and therefore not yours to change.
 
 ## 2. Recon: get it running, get credentials
@@ -121,8 +121,10 @@ Also report what you tried that came back **clean**. "Authorization held on
 all 19 cross-tenant cases" is a real result and tells the user where not to
 spend their next hour.
 
-Then use AskUserQuestion (multiSelect) to let them pick what to fix. Include
-severity in each option so the choice is informed. If a finding needs a design
+Then use the host's structured multi-selection mechanism when available to let
+them pick what to fix. Otherwise, present a numbered list and accept a
+comma-separated selection in chat. Include severity in each option so the
+choice is informed. If a finding needs a design
 decision rather than a fix — two systems disagreeing, a deliberate tradeoff —
 surface the decision instead of silently choosing for them.
 
@@ -137,7 +139,8 @@ that failure mode looks exactly like success from the test suite. Re-running
 the thing that broke is the only check that actually closes the loop.
 
 Add regression tests at the layer the bug lived at, and run the repo's full
-suite plus `make preflight` (per `AGENTS.md`, once, before opening a PR).
+suite plus `make preflight` (per the repository's instruction files, once,
+before opening a PR).
 Distinguish any failure you introduced from the pre-existing ones you
 catalogued in step 4.
 
@@ -149,8 +152,9 @@ baseline from step 3 matches. QA that leaves debris behind poisons the next
 person's run — and if you flipped a provider or a feature flag, leaving it
 flipped is its own outage waiting to happen.
 
-Show the user the restored state, then invoke `/colormath:ship` (the `ship`
-skill) to open the PR, watch the gates, and triage review. Shipping stops at a
+Show the user the restored state, then invoke the `ship` skill through the
+host's native skill mechanism to open the PR, watch the gates, and triage
+review. Shipping stops at a
 merge recommendation; merging stays the user's decision.
 
 If the user declined every finding, don't ship — summarize and stop.

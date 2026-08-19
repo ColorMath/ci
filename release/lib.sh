@@ -6,7 +6,7 @@
 # read_*/write_* pairs below. Adding a new stamp site means adding one pair and
 # one entry in STAMP_SITES — stamp.sh and verify.sh both drive off that list, so
 # a new site cannot be stamped-but-unverified or verified-but-unstamped. That
-# asymmetry is exactly how plugin.json drifted: it was a stamp site nothing
+# asymmetry is exactly how the Claude plugin.json drifted: it was a stamp site nothing
 # checked.
 #
 # Note these are the *machine-read* sites only — refs that something resolves at
@@ -26,7 +26,8 @@ COLORMATH_ROOT="${COLORMATH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pw
 
 GATES_WF="$COLORMATH_ROOT/.github/workflows/gates.yml"
 MAKEFILE="$COLORMATH_ROOT/Makefile.colormath"
-PLUGIN_JSON="$COLORMATH_ROOT/plugin/.claude-plugin/plugin.json"
+CLAUDE_PLUGIN_JSON="$COLORMATH_ROOT/plugin/.claude-plugin/plugin.json"
+CODEX_PLUGIN_JSON="$COLORMATH_ROOT/plugin/.codex-plugin/plugin.json"
 CHANGELOG="$COLORMATH_ROOT/CHANGELOG.md"
 
 # The machine-read stamp sites, as "label:reader:writer". stamp.sh runs every
@@ -34,7 +35,8 @@ CHANGELOG="$COLORMATH_ROOT/CHANGELOG.md"
 STAMP_SITES=(
 	"gates.yml colormath-ref default:read_gates_ref:write_gates_ref"
 	"Makefile.colormath COLORMATH_REF:read_makefile_ref:write_makefile_ref"
-	"plugin.json version:read_plugin_version:write_plugin_version"
+	"Claude plugin.json version:read_claude_plugin_version:write_claude_plugin_version"
+	"Codex plugin.json version:read_codex_plugin_version:write_codex_plugin_version"
 )
 
 die() {
@@ -94,12 +96,20 @@ read_makefile_ref() {
 	sed -n 's/^COLORMATH_REF[[:space:]]*=[[:space:]]*\(v[0-9][0-9.]*\)[[:space:]]*$/\1/p' "$MAKEFILE" | head -1
 }
 
-# plugin.json stores a bare "3.1.0"; print it in "v" form so every reader is
-# directly comparable.
-read_plugin_version() {
-	local raw
-	raw=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*$/\1/p' "$PLUGIN_JSON" | head -1)
+# Plugin manifests store a bare "3.1.0"; print it in "v" form so every reader
+# is directly comparable.
+read_plugin_manifest_version() {
+	local manifest="$1" raw
+	raw=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*$/\1/p' "$manifest" | head -1)
 	[ -n "$raw" ] && echo "v$raw"
+}
+
+read_claude_plugin_version() {
+	read_plugin_manifest_version "$CLAUDE_PLUGIN_JSON"
+}
+
+read_codex_plugin_version() {
+	read_plugin_manifest_version "$CODEX_PLUGIN_JSON"
 }
 
 # The newest *released* section heading in the changelog, ignoring Unreleased.
@@ -130,9 +140,20 @@ write_gates_ref() {
 }
 
 write_makefile_ref() {
-	sed -i "s|^COLORMATH_REF[[:space:]]*=.*$|COLORMATH_REF = $1|" "$MAKEFILE"
+	sed "s|^COLORMATH_REF[[:space:]]*=.*$|COLORMATH_REF = $1|" "$MAKEFILE" >"$MAKEFILE.tmp" &&
+		mv "$MAKEFILE.tmp" "$MAKEFILE"
 }
 
-write_plugin_version() {
-	sed -i "s|^\([[:space:]]*\"version\"[[:space:]]*:[[:space:]]*\"\)[0-9][0-9.]*\(\"\)|\1${1#v}\2|" "$PLUGIN_JSON"
+write_plugin_manifest_version() {
+	local manifest="$1" version="$2"
+	sed "s|^\([[:space:]]*\"version\"[[:space:]]*:[[:space:]]*\"\)[0-9][0-9.]*\(\"\)|\1${version#v}\2|" "$manifest" >"$manifest.tmp" &&
+		mv "$manifest.tmp" "$manifest"
+}
+
+write_claude_plugin_version() {
+	write_plugin_manifest_version "$CLAUDE_PLUGIN_JSON" "$1"
+}
+
+write_codex_plugin_version() {
+	write_plugin_manifest_version "$CODEX_PLUGIN_JSON" "$1"
 }
