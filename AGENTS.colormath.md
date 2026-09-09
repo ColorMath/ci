@@ -65,7 +65,8 @@ If `make preflight` is green, the PR's gates will be too.
 
 ## Shipping
 
-- **Ship branches with `/colormath:ship`** (from the colormath plugin). It is
+- **Ship branches with `/colormath:ship`** (from the colormath plugin, whose
+  marketplace is [ColorMath/skills](https://github.com/ColorMath/skills)). It is
   the one and only way to take a branch through the PR pipeline: it opens the
   PR, watches the gates, reads the review, triages the findings and stops at a
   merge recommendation. Do not hand-roll that loop with ad-hoc `gh` calls. If a

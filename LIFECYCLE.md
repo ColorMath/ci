@@ -21,7 +21,7 @@ release is MAJOR.
   default changed in a way that alters infrastructure; a Makefile target
   renamed; a copier question renamed/removed.
 - **MINOR**: a new gate shipped **opt-in or warn-only**; a new input/variable
-  with a safe default; a new copier-managed file; a new plugin skill.
+  with a safe default; a new copier-managed file.
 - **PATCH**: keeps green things green — bug fixes, action-version bumps inside
   the workflow, comment/doc changes.
 

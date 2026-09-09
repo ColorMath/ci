@@ -302,48 +302,15 @@ groomed one — amendments go on as ticket comments, so the field stays the reco
 of what was intended and the comments record what actually happened. A PR with
 no ticket still gets QA'd; the plan just lives in the PR.
 
-## Optional: Claude Code plugin
+## Optional: Claude Code skills
 
-This repo is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces).
-The `colormath` plugin ships skills for working in consumer repos:
-**`/colormath:ship`** takes the current branch through the whole PR pipeline
-(open the PR, watch the gates, wait for the Thermonuclear Review, execute the
-ticket's **QA plan** against the running stack — writing one when the ticket has
-none — and post its results, fix every finding it can — blockers included) and
-ends at a gated final review that
-**auto-merges** when the PR is genuinely clean or holds and explains why;
-**`/colormath:qa`** QAs a focus area against the running stack and hands the
-fixes to `ship`; **`/colormath:bugfix`** turns a *specific* bug report into a
-merged fix — establishing the facts the report omitted, reproducing the defect
-before touching code, fixing at the layer the invariant belongs to, remediating
-data the bug already corrupted, then handing off to `ship`; and
-**`/colormath:refine-ticket`** grooms a ticket until it can be worked —
-investigating the code *before* it asks anything, so its questions are few and
-concrete, then writing back a standalone description, an implementation plan
-whose every step names a real file, and a QA plan someone could execute; and
-**`/colormath:refine-initiative`** does the layer above for an initiative —
-reading its feature definitions, investigating the architecture and decision
-records they land in, interviewing until the picture is complete, then rewriting
-the initiative and every feature with the background implementation needs, while
-stopping short of code-level plans and never starting the build; and
-**`/colormath:plan-initiative`** closes the loop between the two — running
-`refine-ticket` over every ticket in an initiative, in build order, injecting
-each ticket's place in the sequence and what the earlier plans decided, so the
-seams line up instead of seven independent groomings contradicting each other;
-and **`/colormath:implement-ticket`** takes a groomed ticket the rest of the way
-— checking its plan still matches the code before touching anything, building at
-the layer the plan names, executing the ticket's QA plan against the running
-stack, then handing off to `ship`. Each skill's behavior, prerequisites, and
-contract dependencies are documented in [plugin/README.md](plugin/README.md).
-
-`refine-ticket`, `refine-initiative`, `plan-initiative` and
-`implement-ticket` need the [Abacus](https://github.com/ColorMath/abacus) MCP
-server connected — the plugin's one tracker dependency.
-
-Install manually:
+The `colormath` Claude Code plugin — seven skills that take work from a one-line
+ticket to a merged PR — lives in its own repo,
+**[ColorMath/skills](https://github.com/ColorMath/skills)**, and is documented
+there.
 
 ```
-/plugin marketplace add ColorMath/ci
+/plugin marketplace add ColorMath/skills
 /plugin install colormath@colormath
 ```
 
@@ -354,7 +321,7 @@ or have a consumer repo offer it to everyone who opens it, via
 {
   "extraKnownMarketplaces": {
     "colormath": {
-      "source": { "source": "github", "repo": "ColorMath/ci" }
+      "source": { "source": "github", "repo": "ColorMath/skills" }
     }
   },
   "enabledPlugins": {
@@ -362,6 +329,23 @@ or have a consumer repo offer it to everyone who opens it, via
   }
 }
 ```
+
+The skills marketplace was here until **v4.1.0**. It moved because the two
+halves propagate in opposite directions: consumers pin these gates to an exact
+tag and take an upgrade as a deliberate PR, while Claude Code tracks the skills
+repo's default branch and auto-updates — so a merge there is already the
+release. One tag stream serving both meant every skill wording fix asked four
+repos to take a gate release they did not need.
+
+**If your `.claude/settings.json` still names `ColorMath/ci`, change that one
+line.** The plugin's name is unchanged, so every `/colormath:<skill>` command
+keeps working. Nothing breaks in the meantime — you simply keep running the last
+copy Claude Code fetched.
+
+The skills still encode *this* repo's contract — the `gates / *` check names,
+the `## Thermonuclear Review` comment marker, the `make` endpoints — so a
+release here that renames any of them needs the matching skill change shipped in
+ColorMath/skills.
 
 ## Running the gates locally
 
@@ -466,8 +450,6 @@ While on `0.x`, breaking changes may land in any release.
 .github/workflows/review.yml   # optional reusable AI review workflow
 .github/workflows/ci.yml       # self-test: runs the suite against example/
 .github/actions/               # setup-python-poetry, setup-node, gate-summary
-.claude-plugin/                # plugin marketplace manifest
-plugin/                        # the colormath Claude Code plugin (skills)
 Makefile.colormath             # shared local gate targets — vendored by consumers
 eslint.config.colormath.mjs    # shared eslint base — vendored by consumers
 AGENTS.colormath.md            # shared agent conventions — vendored by consumers

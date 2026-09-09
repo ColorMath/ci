@@ -15,6 +15,9 @@ node_modules/
 # sure a local experiment never commits it.
 .colormath-lib/
 
-# skill-creator eval scratch (contains product-specific fixtures)
+# Leftover skill-creator eval scratch from before the plugin moved to
+# ColorMath/skills. The directories are untracked local artifacts, not something
+# this repo ships; keep ignoring them so removing the plugin does not sweep them
+# into a commit.
 plugin/skills/*/evals/
 plugin/skills/qa-workspace/

@@ -200,6 +200,11 @@ audit_tag() {
 	local tag="$1" g m p problems=""
 	# Early tags predate some of these files entirely; a missing blob is "-",
 	# not an error, so `|| true` guards each pipeline against pipefail.
+	#
+	# plugin.json is no longer a stamp site here — the plugin moved to
+	# ColorMath/skills at v4.2.0, so every tag from there on reads "-". The
+	# column stays because this is an audit of published history, and the tags
+	# up to v4.1.0 did carry it.
 	g=$(git -C "$COLORMATH_ROOT" show "$tag:.github/workflows/gates.yml" 2>/dev/null |
 		awk '/^      colormath-ref:/{f=1;next} f&&/^      [a-z]/{exit} f&&/^        default:/{gsub(/^        default: *"?|"? *$/,"");print;exit}' || true)
 	m=$(git -C "$COLORMATH_ROOT" show "$tag:Makefile.colormath" 2>/dev/null |
