@@ -12,6 +12,59 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+### Removed
+
+- **The Claude Code plugin moved to [ColorMath/skills](https://github.com/ColorMath/skills).**
+  `plugin/` and `.claude-plugin/` are gone from this repo; the seven skills went
+  across unchanged and continue the same version stream, starting at `v4.2.0`
+  there.
+
+  **Every consumer must change one line** in `.claude/settings.json`:
+
+  ```diff
+  -      "source": { "source": "github", "repo": "ColorMath/ci" }
+  +      "source": { "source": "github", "repo": "ColorMath/skills" }
+  ```
+
+  The plugin's name is unchanged, so every `/colormath:<skill>` command keeps
+  working and `enabledPlugins` is untouched. Nothing breaks before the edit is
+  made — Claude Code keeps running the last copy it fetched from here.
+
+  **Why.** The two halves propagate in opposite directions, and one tag stream
+  was serving both. These gates are pinned to an exact tag by every consumer: a
+  release is a contract, MAJOR is defined by what can turn green CI red without
+  the consumer editing anything, and a rollout is a canary chain of bump PRs.
+  Skills are pinned by nobody — Claude Code tracks the marketplace repo's
+  default branch, so a merge reaches every install on its next auto-update and
+  the version is a human-facing label rather than something resolved to fetch.
+  Under one stream, a skill wording fix asked four repos to take a gate release
+  they did not need, and an urgent skill fix waited behind whatever was
+  unfinished in the gates.
+
+  This is **MINOR, not MAJOR**, on the rule in [LIFECYCLE.md](LIFECYCLE.md):
+  nothing a consumer runs can turn from green to red without them editing
+  anything. A consumer that never makes the edit above keeps the skills it
+  already has; it just stops receiving updates to them.
+
+  The skills still encode *this* repo's contract — the `gates / *` check names,
+  the `## Thermonuclear Review` marker, the `make` endpoints — so a release here
+  that renames any of them needs the matching skill change shipped there. That
+  coupling was the argument for keeping them together, and it is a
+  release-notes obligation rather than a reason to share a tag stream.
+
+### Changed
+
+- **`release/lib.sh` is down to two stamp sites.** `plugin.json version` left
+  with the plugin, along with `read_plugin_version` / `write_plugin_version`.
+  `verify.sh --audit-all` keeps its PLUGIN column: it audits published history,
+  and every tag up to `v4.1.0` carried the file. Tags from `v4.2.0` on read `-`
+  there, which is correct rather than a missing stamp.
+
+- **`AGENTS.colormath.md` names where the plugin comes from.** One line, in the
+  Shipping section, so a consumer reading the vendored conventions can find the
+  marketplace. Vendored, so it reaches consumers on their next
+  `make colormath-update`.
+
 ## v4.1.0 — 2026-08-19
 
 MINOR. Behaviour added to an existing plugin skill; no gate becomes stricter and

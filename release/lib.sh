@@ -6,8 +6,9 @@
 # read_*/write_* pairs below. Adding a new stamp site means adding one pair and
 # one entry in STAMP_SITES — stamp.sh and verify.sh both drive off that list, so
 # a new site cannot be stamped-but-unverified or verified-but-unstamped. That
-# asymmetry is exactly how plugin.json drifted: it was a stamp site nothing
-# checked.
+# asymmetry is exactly how plugin.json drifted while it still lived here: it was
+# a stamp site nothing checked. It has since moved to ColorMath/skills, but the
+# lesson is why the list exists at all.
 #
 # Note these are the *machine-read* sites only — refs that something resolves at
 # runtime. Documentation examples are deliberately not stamped; they carry a
@@ -26,7 +27,6 @@ COLORMATH_ROOT="${COLORMATH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pw
 
 GATES_WF="$COLORMATH_ROOT/.github/workflows/gates.yml"
 MAKEFILE="$COLORMATH_ROOT/Makefile.colormath"
-PLUGIN_JSON="$COLORMATH_ROOT/plugin/.claude-plugin/plugin.json"
 CHANGELOG="$COLORMATH_ROOT/CHANGELOG.md"
 
 # The machine-read stamp sites, as "label:reader:writer". stamp.sh runs every
@@ -34,7 +34,6 @@ CHANGELOG="$COLORMATH_ROOT/CHANGELOG.md"
 STAMP_SITES=(
 	"gates.yml colormath-ref default:read_gates_ref:write_gates_ref"
 	"Makefile.colormath COLORMATH_REF:read_makefile_ref:write_makefile_ref"
-	"plugin.json version:read_plugin_version:write_plugin_version"
 )
 
 die() {
@@ -94,14 +93,6 @@ read_makefile_ref() {
 	sed -n 's/^COLORMATH_REF[[:space:]]*=[[:space:]]*\(v[0-9][0-9.]*\)[[:space:]]*$/\1/p' "$MAKEFILE" | head -1
 }
 
-# plugin.json stores a bare "3.1.0"; print it in "v" form so every reader is
-# directly comparable.
-read_plugin_version() {
-	local raw
-	raw=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*$/\1/p' "$PLUGIN_JSON" | head -1)
-	[ -n "$raw" ] && echo "v$raw"
-}
-
 # The newest *released* section heading in the changelog, ignoring Unreleased.
 read_changelog_latest() {
 	sed -n 's/^## \(v[0-9][0-9.]*\) — .*$/\1/p' "$CHANGELOG" | head -1
@@ -131,8 +122,4 @@ write_gates_ref() {
 
 write_makefile_ref() {
 	sed -i "s|^COLORMATH_REF[[:space:]]*=.*$|COLORMATH_REF = $1|" "$MAKEFILE"
-}
-
-write_plugin_version() {
-	sed -i "s|^\([[:space:]]*\"version\"[[:space:]]*:[[:space:]]*\"\)[0-9][0-9.]*\(\"\)|\1${1#v}\2|" "$PLUGIN_JSON"
 }
