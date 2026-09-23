@@ -30,6 +30,15 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Named so `run:` steps get `bash --noprofile --norc -eo pipefail {0}` rather
+# than GitHub's implicit `bash -e {0}`. Without pipefail, a step whose command
+# is piped — `… | tee "$GITHUB_OUTPUT"` below, for one — exits with the
+# pipeline's LAST status and reports success however the command fared. See
+# release/verify-gate-shells.sh, which fails the build if a job loses this.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   release:
     runs-on: ubuntu-latest

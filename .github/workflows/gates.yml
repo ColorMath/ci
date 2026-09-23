@@ -43,13 +43,25 @@ name: Gates
 # $GITHUB_STEP_SUMMARY, so the whole gate matrix is legible at a glance.
 # Gate commands tee output to /tmp/*.log; the summary reads the log back.
 #
-# The workflow-level `defaults.run.shell: bash` below is load-bearing, not
-# cosmetic. GitHub's implicit shell for a `run:` step is `bash -e {0}` — no
-# `pipefail` — so in `gate-cmd 2>&1 | tee /tmp/x.log` the pipeline's status is
-# tee's, and every gate failure was silently swallowed. Naming the shell
-# explicitly gets `bash --noprofile --norc -eo pipefail {0}`, so the gate
-# command's exit code is the step's. Do not remove it, and do not add a
-# job-level `defaults.run.shell` that overrides it.
+# `defaults.run.shell: bash` is load-bearing, not cosmetic. GitHub's implicit
+# shell for a `run:` step is `bash -e {0}` — no `pipefail` — so in
+# `gate-cmd 2>&1 | tee /tmp/x.log` the pipeline's status is tee's, and every
+# gate failure is silently swallowed. Naming the shell explicitly gets
+# `bash --noprofile --norc -eo pipefail {0}`, so the gate command's exit code
+# is the step's.
+#
+# It has to be named in EVERY job, not once at the workflow level. A job-level
+# `defaults.run` REPLACES the workflow-level one; it does not merge with it per
+# key. So a job setting only `working-directory` — which is every job here —
+# drops the workflow-level `shell` and falls back to the implicit `bash -e`.
+# This file declared it once at the top and asserted the per-key merge in a
+# comment, and for three releases every gate reported success whatever the tool
+# found: one consumer's run printed `✖ 1 problem (1 error)` from html-validate
+# and `1 failed, 4424 passed` from pytest, and both gates went green. `secrets`
+# was the only job with no job-level `defaults`, and so the only one gating.
+#
+# When you add a job, put `shell: bash` beside its `working-directory`. The
+# workflow-level default is kept for any `run:` step in a job that sets none.
 
 on:
   workflow_call:
@@ -204,9 +216,9 @@ env:
   # Resolved base branch for diff-coverage: explicit input, else repo default.
   DEFAULT_BRANCH: ${{ inputs.default-branch != '' && inputs.default-branch || github.event.repository.default_branch }}
 
-# Applies to every `run:` step in every job below. Jobs set only
-# `defaults.run.working-directory`, which merges with this per-key rather than
-# replacing it. See the header comment: without this, `| tee` masks exit codes.
+# A fallback, NOT the thing that makes the gates gate. Every job below sets its
+# own `defaults.run`, which replaces this wholesale rather than merging with it
+# per key — so each of them repeats `shell: bash`. See the header comment.
 defaults:
   run:
     shell: bash
@@ -218,6 +230,12 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -272,6 +290,12 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Free up disk space
@@ -355,6 +379,12 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -403,6 +433,12 @@ jobs:
     # pyproject.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -452,6 +488,12 @@ jobs:
     # v2.0.0; a consumer with no contracts sets enable-import-linter: false.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -503,6 +545,12 @@ jobs:
     # enable-migrations: false in a consumer without alembic.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code (PR head, full history)
@@ -554,6 +602,12 @@ jobs:
     # Python gets ruff and CSS gets stylelint but JS only gets tests.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -597,6 +651,12 @@ jobs:
     # colors/font-sizes that should be theme() / var(--token).
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -642,6 +702,12 @@ jobs:
     # come from [tool.djlint] in the consumer's pyproject.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -687,6 +753,12 @@ jobs:
     # per [tool.bandit] in the consumer's pyproject, fails on Medium+.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -782,6 +854,12 @@ jobs:
     # Static accessibility lint of the templates (html-validate:a11y preset).
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -827,6 +905,12 @@ jobs:
     # Groups + allowlist come from the consumer's .colormath/audit.conf.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -931,6 +1015,12 @@ jobs:
 
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -978,6 +1068,12 @@ jobs:
     # as gitleaks.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Check out code
@@ -1024,6 +1120,12 @@ jobs:
     # untested code, only on new/changed lines that lack tests.
     defaults:
       run:
+        # `shell: bash` is repeated here, not inherited. A job-level
+        # `defaults.run` REPLACES the workflow-level one rather than merging
+        # with it per key, so a job naming only `working-directory` silently
+        # drops the workflow-level `shell: bash` and falls back to GitHub's
+        # implicit `bash -e {0}` — no pipefail. See the header comment.
+        shell: bash
         working-directory: ${{ inputs.workdir }}
     steps:
       - name: Free up disk space
