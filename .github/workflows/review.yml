@@ -97,6 +97,15 @@ on:
         description: Anthropic API key used by the review agent
         required: true
 
+# Named so `run:` steps get `bash --noprofile --norc -eo pipefail {0}` rather
+# than GitHub's implicit `bash -e {0}`. Without pipefail, a step whose command
+# is piped — `… | tee "$GITHUB_OUTPUT"` below, for one — exits with the
+# pipeline's LAST status and reports success however the command fared. See
+# release/verify-gate-shells.sh, which fails the build if a job loses this.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Decides whether this diff is worth paying a reviewer for, before any model
   # is invoked. Runs on a bare runner and calls one REST endpoint, so a skipped

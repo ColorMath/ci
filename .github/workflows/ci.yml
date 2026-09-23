@@ -19,6 +19,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Named so `run:` steps get `bash --noprofile --norc -eo pipefail {0}` rather
+# than GitHub's implicit `bash -e {0}`. Without pipefail, a step whose command
+# is piped — `… | tee "$GITHUB_OUTPUT"` below, for one — exits with the
+# pipeline's LAST status and reports success however the command fared. See
+# release/verify-gate-shells.sh, which fails the build if a job loses this.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Every version this repo writes down must agree, and must name a tag that
   # exists. Consumers pin exact tags, so a stamp naming an untagged version
@@ -38,6 +47,17 @@ jobs:
           # verify.sh compares the stamps against the newest reachable tag.
           fetch-depth: 0
       - run: ./release/verify.sh
+
+  # Structural, and blocking for the same reason release-consistency is: it can
+  # only fail on a PR that edited a workflow's `defaults.run`. It has to be a
+  # check of its own rather than something the gate suite below would catch,
+  # because the failure it guards against is precisely one that makes that
+  # suite report success.
+  gate-shells:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: ./release/verify-gate-shells.sh
 
   gates:
     uses: ./.github/workflows/gates.yml
