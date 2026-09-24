@@ -52,6 +52,69 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
   coupling was the argument for keeping them together, and it is a
   release-notes obligation rather than a reason to share a tag stream.
 
+### Fixed
+
+- **Every gate can fail again.** Fifteen of the sixteen gate jobs could not turn
+  a build red, whatever the tool they ran reported. Gate steps are written
+  `gate-cmd 2>&1 | tee /tmp/x.log` so `gate-summary` can read the output back;
+  GitHub's implicit shell for a `run:` step is `bash -e {0}`, which has no
+  `pipefail`, so the pipeline exited with `tee`'s status — 0 — regardless.
+
+  `gates.yml` declared `defaults.run.shell: bash` once at the workflow level and
+  asserted in a comment that a job-level `defaults.run` "merges with this per-key
+  rather than replacing it". **It does not.** A job-level `defaults.run` replaces
+  the workflow-level one wholesale, so every job naming a `working-directory` —
+  all fifteen — silently reverted to the implicit shell. `secrets` was the only
+  job without job-level defaults, and so the only gate that has been gating.
+
+  Present in `v3.0.0`, `v3.1.0` and `v4.x`. Measured on a consumer
+  ([ColorMath/abacus run 35854750172](https://github.com/ColorMath/abacus/actions/runs/35854750172)):
+  the a11y step printed `✖ 1 problem (1 error, 0 warnings)` and the tests step
+  printed `1 failed, 4424 passed`, and **both reported success**.
+
+  Each job now names `shell: bash` beside its `working-directory`.
+  `review.yml`, `ci.yml` and `release.yml` gain a workflow-level default for the
+  same reason — `review.yml`'s `triage` job pipes `python3 - <<'PY' | tee -a
+  "$GITHUB_OUTPUT"`, so a triage that threw was a triage that passed, and triage
+  decides `skip-paths` for the whole review.
+
+  `release/verify-gate-shells.sh` now fails the build if any job containing
+  `run:` steps resolves to anything other than `shell: bash`, and `ci.yml` runs
+  it as a blocking `gate-shells` job. A comment saying not to break this was
+  already there and was not enough: nobody removed it, they added a sibling key
+  three lines below. The failure is invisible by construction — when it is wrong
+  the builds go *green* — so only a structural check can catch it.
+
+  **This is MAJOR** on [LIFECYCLE.md](LIFECYCLE.md)'s rule. Nothing about any
+  gate's configuration changed, but a consumer's green CI can go red on the
+  first run after the bump, without them editing anything — which is precisely
+  what the rule names. The red is not a regression: those builds were already
+  failing.
+
+### Upgrade notes
+
+Paste into Claude Code in each consumer repo:
+
+> Bump the colormath pins to `vX.Y.Z`: update the `uses:` refs in
+> `.github/workflows/gates.yml` and the review caller (`review.yml` or
+> `review.yaml`), set `COLORMATH_REF` in `Makefile.colormath` to match, and run
+> `make colormath-update REF=vX.Y.Z` to refresh the vendored files. Then run
+> `make preflight` **before opening the bump PR** — the gates now report
+> honestly, so anything this repo has accumulated while they could not fail will
+> surface on that run rather than in CI.
+
+**Expect the first post-bump run to be red, and bump one repo at a time.** Every
+consumer has been shipping against gates that could not fail for three releases,
+so whatever each has accumulated arrives at once. `make preflight` has always
+gated correctly and is the cheapest way to see it first: it is the same tools at
+the same versions, and it exits non-zero.
+
+If a gate is red for something you do not intend to fix now, the honest move is
+`enable-<gate>: false` in `gates.yml` **and** the matching target in
+`COLORMATH_PREFLIGHT_SKIP` in the `Makefile` — the two must stay in lockstep, or
+preflight and CI disagree about what ran. That is a deliberate, visible opt-out.
+Leaving it pinned to an older tag is the same thing said quietly.
+
 ### Changed
 
 - **`release/lib.sh` is down to two stamp sites.** `plugin.json version` left
