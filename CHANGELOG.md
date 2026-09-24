@@ -12,6 +12,8 @@ version's [GitHub Release](https://github.com/ColorMath/ci/releases).
 
 ## Unreleased
 
+## v5.0.0 — 2026-09-24
+
 ### Removed
 
 - **The Claude Code plugin moved to [ColorMath/skills](https://github.com/ColorMath/skills).**
